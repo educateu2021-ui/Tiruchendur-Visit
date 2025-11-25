@@ -37,19 +37,6 @@ div.stButton > button {
     padding: 0.45rem 0.9rem;
     font-weight: 600;
 }
-
-/* Attempt to colour buttons by label text (works in most browsers) */
-div.stButton > button:contains("🧭 Visited"),
-div.stButton > button:contains("✅ Visited") {
-    background-color: #D45113;
-    color: white;
-}
-
-div.stButton > button:contains("📝 Registered"),
-div.stButton > button:contains("✅ Registered") {
-    background-color: #F9A03F;
-    color: white;
-}
 </style>
 """, unsafe_allow_html=True)
 
@@ -79,7 +66,8 @@ def get_template_excel() -> bytes:
     columns = [
         "S.NO", "MASON CODE", "MASON NAME", "CONTACT NUMBER",
         "DLR NAME", "Location", "DAY", "Category",
-        "HW305", "HW101", "Hw201", "HW103", "HW302", "HW310", "other"
+        "HW305", "HW101", "Hw201", "HW103", "HW302", "HW310", "other",
+        "Visited_Status", "Visited_At", "Registered_Status", "Registered_At"
     ]
     df_template = pd.DataFrame(columns=columns)
     output = BytesIO()
@@ -148,7 +136,7 @@ if "data" not in st.session_state:
 if "prev_data" not in st.session_state:
     st.session_state["prev_data"] = None
 
-# ✅ Ensure status columns exist
+# ✅ Ensure status columns exist even for older files
 for col in ["Visited_Status", "Visited_At", "Registered_Status", "Registered_At"]:
     if col not in st.session_state["data"].columns:
         st.session_state["data"][col] = ""
@@ -188,7 +176,6 @@ with st.expander("🛠️ Data Management (Import / Add / Undo)", expanded=False
                     if new_data is not None:
                         save_state_for_undo()
                         st.session_state["data"] = new_data
-                        # ensure new columns exist in imported file
                         for col in ["Visited_Status", "Visited_At", "Registered_Status", "Registered_At"]:
                             if col not in st.session_state["data"].columns:
                                 st.session_state["data"][col] = ""
@@ -315,6 +302,13 @@ with st.expander("🔍 Filter Data", expanded=True):
         show_only_products = st.checkbox("Has Products")
         show_no_products = st.checkbox("No Products")
 
+    # extra row for visited / registered filters
+    vc1, vc2 = st.columns(2)
+    with vc1:
+        visit_filter = st.selectbox("Visited Status", ["All", "Visited", "Not Visited"])
+    with vc2:
+        reg_filter = st.selectbox("Registered Status", ["All", "Registered", "Not Registered"])
+
 # Apply filters
 if not df_display.empty:
     if selected_location != "All":
@@ -329,6 +323,26 @@ if not df_display.empty:
         ]
     elif selected_cat != "All":
         df_display = df_display[df_display["Category"] == selected_cat]
+
+    # Visited filter
+    if "Visited_Status" in df_display.columns:
+        if visit_filter == "Visited":
+            df_display = df_display[df_display["Visited_Status"] == "Visited"]
+        elif visit_filter == "Not Visited":
+            df_display = df_display[
+                (df_display["Visited_Status"].isna()) |
+                (df_display["Visited_Status"] == "")
+            ]
+
+    # Registered filter
+    if "Registered_Status" in df_display.columns:
+        if reg_filter == "Registered":
+            df_display = df_display[df_display["Registered_Status"] == "Registered"]
+        elif reg_filter == "Not Registered":
+            df_display = df_display[
+                (df_display["Registered_Status"].isna()) |
+                (df_display["Registered_Status"] == "")
+            ]
 
     hw_cols = ["HW305", "HW101", "Hw201", "HW103", "HW302", "HW310"]
 
@@ -416,6 +430,15 @@ with tab_cards:
                     + (", ".join(prod_list) if prod_list else "_No products listed_")
                 )
 
+                # Show current status on card
+                status_line = []
+                if visited_status:
+                    status_line.append("🧭 Visited")
+                if registered_status:
+                    status_line.append("📝 Registered")
+                if status_line:
+                    st.caption("Status: " + ", ".join(status_line))
+
                 st.markdown("---")
 
                 b_call, b_visit, b_reg = st.columns(3)
@@ -460,7 +483,7 @@ with tab_cards:
                             unsafe_allow_html=True,
                         )
 
-                # VISITED BUTTON
+                # VISITED BUTTON (Streamlit)
                 with b_visit:
                     label = "🧭 Visited" if not visited_status else "✅ Visited"
                     if st.button(label, key=f"visit_{code}_{idx}"):
@@ -474,7 +497,7 @@ with tab_cards:
                         st.success(f"Marked {name} as visited.")
                         st.rerun()
 
-                # REGISTERED BUTTON
+                # REGISTERED BUTTON (Streamlit)
                 with b_reg:
                     label = "📝 Registered" if not registered_status else "✅ Registered"
                     if st.button(label, key=f"reg_{code}_{idx}"):
@@ -503,6 +526,7 @@ with tab_graphs:
                 st.bar_chart(df_display["DAY"].value_counts())
 
         col3, col4 = st.columns(2)
+        hw_cols = ["HW305", "HW101", "Hw201", "HW103", "HW302", "HW310"]
         with col3:
             st.write("**Product Popularity**")
             available = [c for c in hw_cols if c in df_display.columns]
@@ -562,6 +586,4 @@ with tab_data:
             to_excel(st.session_state["data"]),
             "mason_full_report.xlsx",
         )
-
-
 
