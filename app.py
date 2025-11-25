@@ -7,6 +7,116 @@ from pathlib import Path
 # ------------ CONFIG ------------
 st.set_page_config(page_title="Mason Data Manager", layout="wide")
 st.title("Mason Data Management System")
+st.markdown("""
+<style>
+/* Mason grid layout */
+.mason-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 1.5rem;
+    margin-top: 1rem;
+}
+
+/* Card style */
+.mason-card {
+    background: #ffffff;
+    border-radius: 12px;
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    border-top: 4px solid #4f46e5;
+    box-shadow: 0 10px 15px rgba(15, 23, 42, 0.08);
+}
+
+/* Mason name & header */
+.mason-name {
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: #0f172a;
+    margin-bottom: 4px;
+}
+
+.mason-code {
+    font-size: 0.8rem;
+    color: #64748b;
+    font-weight: 500;
+}
+
+.mason-tag {
+    font-size: 0.75rem;
+    padding: 3px 8px;
+    border-radius: 6px;
+    background: #f1f5f9;
+    color: #475569;
+}
+
+/* Meta rows */
+.mason-meta-row {
+    display: flex;
+    font-size: 0.85rem;
+    margin-top: 4px;
+}
+
+.mason-meta-label {
+    width: 80px;
+    font-weight: 600;
+    color: #64748b;
+}
+
+.mason-meta-value {
+    color: #0f172a;
+}
+
+.mason-day {
+    font-weight: 700;
+    color: #1d4ed8;
+}
+
+/* Products */
+.mason-section-title {
+    margin-top: 8px;
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    font-weight: 600;
+    color: #64748b;
+}
+
+.mason-products-empty {
+    font-size: 0.75rem;
+    font-style: italic;
+    color: #94a3b8;
+    margin-top: 2px;
+}
+
+/* Call button */
+.mason-call-btn {
+    margin-top: 12px;
+    width: 100%;
+    padding: 10px 16px;
+    border-radius: 8px;
+    background: #16a34a;
+    color: #ffffff;
+    font-size: 0.9rem;
+    font-weight: 600;
+    border: none;
+    text-align: center;
+    text-decoration: none;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: background 0.15s ease;
+}
+
+.mason-call-btn:hover {
+    background: #15803d;
+}
+
+.mason-call-icon {
+    margin-right: 6px;
+}
+</style>
+""", unsafe_allow_html=True)
 
 DATA_FILE = "mason_data.xlsx"  # persistent storage file
 
@@ -359,13 +469,14 @@ tab_cards, tab_graphs, tab_data = st.tabs(
     ["📇 Mason Cards", "📈 Analytics", "📝 Data Editor"]
 )
 
+import streamlit.components.v1 as components  # at top of file
+
 # ----- CARDS TAB -----
 with tab_cards:
+    st.subheader("Mason Directory")
+
     if not df_display.empty:
-        # Outer grid container (exactly like your sample)
-        html_content = """
-        <div id="mason-list-container" class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-        """
+        html = '<div class="mason-grid">'
 
         for _, row in df_display.iterrows():
             name = row.get("MASON NAME", "Unknown")
@@ -379,69 +490,78 @@ with tab_cards:
 
             # Products
             hw_cols = ["HW305", "HW101", "Hw201", "HW103", "HW302", "HW310"]
-            products_html = ""
-            has_prod = False
+            product_badges = []
             for p in hw_cols:
                 if p in row and isinstance(row[p], str) and "YES" in row[p].upper():
-                    has_prod = True
-                    p_clean = p.upper()
-                    products_html += f"""
-                        <span class="inline-block bg-indigo-100 text-indigo-800 text-xs font-medium px-2.5 py-0.5 rounded-full border border-indigo-200 mr-1 mb-1">
-                            {p_clean}
-                        </span>
-                    """
+                    product_badges.append(p.upper())
 
-            if not has_prod:
-                products_html = """
-                    <span class="text-xs text-slate-400 italic">No products listed</span>
-                """
+            if product_badges:
+                products_html = " ".join(
+                    f'<span class="mason-tag">{p}</span>' for p in product_badges
+                )
+            else:
+                products_html = '<span class="mason-products-empty">No products listed</span>'
 
             # Call button
             if contact and contact.lower() != "nan":
-                call_btn = f"""
-                <a href="tel:{contact}" class="inline-flex items-center justify-center w-full px-4 py-2 bg-green-600 hover:bg-green-700 text-white text-sm font-medium rounded-md transition-colors mt-3">
-                    <span class="mr-2">📞</span> Call Now
-                </a>
-                """
+                call_html = f'''
+                    <a href="tel:{contact}" class="mason-call-btn">
+                        <span class="mason-call-icon">📞</span> Call Now
+                    </a>
+                '''
             else:
-                call_btn = """
-                <button disabled class="inline-flex items-center justify-center w-full px-4 py-2 bg-slate-300 text-slate-500 text-sm font-medium rounded-md mt-3 cursor-not-allowed">
-                    No Contact
-                </button>
-                """
+                call_html = '''
+                    <button class="mason-call-btn" style="background:#cbd5f5;cursor:not-allowed;">
+                        No Contact
+                    </button>
+                '''
 
-            # Single card (matches your HTML)
             card_html = f"""
-            <div class="bg-white rounded-lg shadow p-5 flex flex-col transition-all duration-300 hover:shadow-lg border-t-4 border-indigo-500">
-                <div class="mb-3">
-                    <h3 class="text-xl font-bold text-slate-800">{name}</h3>
-                    <div class="flex justify-between items-center">
-                        <p class="text-sm text-slate-500 font-medium">{code}</p>
-                        <span class="bg-slate-100 text-slate-600 text-xs px-2 py-1 rounded">{cat}</span>
+            <div class="mason-card">
+                <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px;">
+                    <div>
+                        <div class="mason-name">{name}</div>
+                        <div class="mason-code">{code}</div>
+                    </div>
+                    <span class="mason-tag">{cat}</span>
+                </div>
+
+                <div>
+                    <div class="mason-meta-row">
+                        <div class="mason-meta-label">Contact:</div>
+                        <div class="mason-meta-value">{contact}</div>
+                    </div>
+                    <div class="mason-meta-row">
+                        <div class="mason-meta-label">Location:</div>
+                        <div class="mason-meta-value">{loc}</div>
+                    </div>
+                    <div class="mason-meta-row">
+                        <div class="mason-meta-label">DLR:</div>
+                        <div class="mason-meta-value">{dlr}</div>
+                    </div>
+                    <div class="mason-meta-row">
+                        <div class="mason-meta-label">Day:</div>
+                        <div class="mason-meta-value mason-day">{day}</div>
                     </div>
                 </div>
-                <div class="space-y-2 text-sm text-slate-700 mb-4 flex-grow">
-                    <p class="flex items-start"><span class="w-24 font-semibold text-slate-500">Contact:</span> {contact}</p>
-                    <p class="flex items-start"><span class="w-24 font-semibold text-slate-500">Location:</span> {loc}</p>
-                    <p class="flex items-start"><span class="w-24 font-semibold text-slate-500">DLR:</span> {dlr}</p>
-                    <p class="flex items-start"><span class="w-24 font-semibold text-slate-500">Day:</span> <span class="font-semibold text-indigo-700">{day}</span></p>
+
+                <hr style="border:none;border-top:1px solid #e2e8f0;margin:12px 0 6px 0;">
+
+                <div>
+                    <div class="mason-section-title">Products:</div>
+                    <div style="margin-top:4px;">{products_html}</div>
                 </div>
-                <div class="mt-auto pt-3 border-t border-slate-200">
-                    <h4 class="text-xs font-semibold text-slate-600 mb-2">Products:</h4>
-                    <div class="flex flex-wrap gap-2 mb-3">
-                        {products_html}
-                    </div>
-                    {call_btn}
-                </div>
+
+                {call_html}
             </div>
             """
 
-            html_content += card_html
+            html += card_html
 
-        html_content += "</div>"
+        html += "</div>"
 
-        # Render the HTML cards
-        components.html(html_content, height=800, scrolling=True)
+        # Render inside Streamlit (no script, just HTML+CSS)
+        st.markdown(html, unsafe_allow_html=True)
     else:
         st.info("No masons found matching filters.")
 
