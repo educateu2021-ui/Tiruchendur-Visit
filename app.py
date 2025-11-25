@@ -1,24 +1,26 @@
-import streamlit.components.v1 as components
-import textwrap
 import streamlit as st
+import streamlit.components.v1 as components  # still available if you need later
 import pandas as pd
 from io import BytesIO
 from pathlib import Path
+from datetime import datetime
 
 # ------------ CONFIG ------------
 st.set_page_config(page_title="Mason Data Manager", layout="wide")
 st.title("Mason Data Management System")
+
+DATA_FILE = "mason_data.xlsx"  # persistent storage file
+
+# ------------ GLOBAL CSS ------------
 st.markdown("""
 <style>
-/* Mason grid layout */
+/* General card look if you want to use HTML later */
 .mason-grid {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
     gap: 1.5rem;
     margin-top: 1rem;
 }
-
-/* Card style */
 .mason-card {
     background: #ffffff;
     border-radius: 12px;
@@ -29,141 +31,43 @@ st.markdown("""
     box-shadow: 0 10px 15px rgba(15, 23, 42, 0.08);
 }
 
-/* Mason name & header */
-.mason-name {
-    font-size: 1.1rem;
-    font-weight: 700;
-    color: #0f172a;
-    margin-bottom: 4px;
-}
-
-.mason-code {
-    font-size: 0.8rem;
-    color: #64748b;
-    font-weight: 500;
-}
-
-.mason-tag {
-    font-size: 0.75rem;
-    padding: 3px 8px;
-    border-radius: 6px;
-    background: #f1f5f9;
-    color: #475569;
-}
-
-/* Meta rows */
-.mason-meta-row {
-    display: flex;
-    font-size: 0.85rem;
-    margin-top: 4px;
-}
-
-.mason-meta-label {
-    width: 80px;
-    font-weight: 600;
-    color: #64748b;
-}
-
-.mason-meta-value {
-    color: #0f172a;
-}
-
-.mason-day {
-    font-weight: 700;
-    color: #1d4ed8;
-}
-
-/* Products */
-.mason-section-title {
-    margin-top: 8px;
-    font-size: 0.75rem;
-    text-transform: uppercase;
-    font-weight: 600;
-    color: #64748b;
-}
-
-.mason-products-empty {
-    font-size: 0.75rem;
-    font-style: italic;
-    color: #94a3b8;
-    margin-top: 2px;
-}
-
-/* Call button */
-.mason-call-btn {
-    margin-top: 12px;
-    width: 100%;
-    padding: 10px 16px;
+/* Style all Streamlit buttons a bit nicer */
+div.stButton > button {
     border-radius: 8px;
-    background: #16a34a;
-    color: #ffffff;
-    font-size: 0.9rem;
+    padding: 0.45rem 0.9rem;
     font-weight: 600;
-    border: none;
-    text-align: center;
-    text-decoration: none;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    cursor: pointer;
-    transition: background 0.15s ease;
 }
 
-.mason-call-btn:hover {
-    background: #15803d;
+/* Attempt to colour buttons by label text (works in most browsers) */
+div.stButton > button:contains("🧭 Visited"),
+div.stButton > button:contains("✅ Visited") {
+    background-color: #D45113;
+    color: white;
 }
 
-.mason-call-icon {
-    margin-right: 6px;
+div.stButton > button:contains("📝 Registered"),
+div.stButton > button:contains("✅ Registered") {
+    background-color: #F9A03F;
+    color: white;
 }
 </style>
 """, unsafe_allow_html=True)
 
-DATA_FILE = "mason_data.xlsx"  # persistent storage file
-
-# ------------ TAILWIND & CSS ------------
+# ------------ TAILWIND & SCROLLBAR (optional) ------------
 st.markdown("""
 <script src="https://cdn.tailwindcss.com"></script>
 <style>
-    .stMarkdown {
-        width: 100%;
-    }
-    ::-webkit-scrollbar {
-        width: 8px;
-        height: 8px;
-    }
-    ::-webkit-scrollbar-track {
-        background: #f1f1f1; 
-    }
-    ::-webkit-scrollbar-thumb {
-        background: #c7c7c7; 
-        border-radius: 4px;
-    }
-    ::-webkit-scrollbar-thumb:hover {
-        background: #a8a8a8; 
-    }
-    .mason-grid {
-        display: grid;
-        grid-template-columns: repeat(1, minmax(0, 1fr));
-        gap: 1.5rem;
-    }
-    @media (min-width: 768px) {
-        .mason-grid {
-            grid-template-columns: repeat(2, minmax(0, 1fr));
-        }
-    }
-    @media (min-width: 1280px) {
-        .mason-grid {
-            grid-template-columns: repeat(3, minmax(0, 1fr));
-        }
-    }
+    .stMarkdown { width: 100%; }
+    ::-webkit-scrollbar { width: 8px; height: 8px; }
+    ::-webkit-scrollbar-track { background: #f1f1f1; }
+    ::-webkit-scrollbar-thumb { background: #c7c7c7; border-radius: 4px; }
+    ::-webkit-scrollbar-thumb:hover { background: #a8a8a8; }
 </style>
 """, unsafe_allow_html=True)
 
 # ------------ HELPERS ------------
 
 def clean_dataframe(df: pd.DataFrame) -> pd.DataFrame:
-    """Standardizes dataframe: strips whitespace, handles NaNs, fixes S.NO."""
     df.columns = [str(c).strip() for c in df.columns]
     df = df.applymap(lambda x: x.strip() if isinstance(x, str) else x)
     df = df.fillna("")
@@ -171,9 +75,7 @@ def clean_dataframe(df: pd.DataFrame) -> pd.DataFrame:
         df["S.NO"] = pd.to_numeric(df["S.NO"], errors="coerce").fillna(0).astype(int)
     return df
 
-
 def get_template_excel() -> bytes:
-    """Generates an empty template file with correct headers."""
     columns = [
         "S.NO", "MASON CODE", "MASON NAME", "CONTACT NUMBER",
         "DLR NAME", "Location", "DAY", "Category",
@@ -185,9 +87,7 @@ def get_template_excel() -> bytes:
         df_template.to_excel(writer, index=False, sheet_name="Template")
     return output.getvalue()
 
-
 def load_excel_data(uploaded_file) -> pd.DataFrame | None:
-    """Helper to read excel."""
     try:
         df = pd.read_excel(uploaded_file)
         return clean_dataframe(df)
@@ -195,19 +95,14 @@ def load_excel_data(uploaded_file) -> pd.DataFrame | None:
         st.error(f"Error loading file: {e}")
         return None
 
-
 def save_state_for_undo():
-    """Saves the current dataframe to history before making changes."""
     st.session_state["prev_data"] = st.session_state["data"].copy()
 
-
 def to_excel(df: pd.DataFrame) -> bytes:
-    """Convert DF to Excel bytes."""
     output = BytesIO()
     with pd.ExcelWriter(output, engine="openpyxl") as writer:
         df.to_excel(writer, index=False, sheet_name="MasonData")
     return output.getvalue()
-
 
 # ------------ INITIAL DATA (HARD-CODED + PERSISTENCE) ------------
 
@@ -245,7 +140,6 @@ def get_initial_dataset() -> pd.DataFrame:
     ])
     return df
 
-
 # ------------ SESSION STATE INIT ------------
 
 if "data" not in st.session_state:
@@ -253,6 +147,11 @@ if "data" not in st.session_state:
 
 if "prev_data" not in st.session_state:
     st.session_state["prev_data"] = None
+
+# ✅ Ensure status columns exist
+for col in ["Visited_Status", "Visited_At", "Registered_Status", "Registered_At"]:
+    if col not in st.session_state["data"].columns:
+        st.session_state["data"][col] = ""
 
 # ------------ DATA MANAGEMENT EXPANDER ------------
 
@@ -263,7 +162,6 @@ with st.expander("🛠️ Data Management (Import / Add / Undo)", expanded=False
         if st.button("↩️ Undo Last Change", type="primary"):
             st.session_state["data"] = st.session_state["prev_data"]
             st.session_state["prev_data"] = None
-            # persist undo
             st.session_state["data"].to_excel(DATA_FILE, index=False)
             st.success("Restored previous version!")
             st.rerun()
@@ -290,7 +188,10 @@ with st.expander("🛠️ Data Management (Import / Add / Undo)", expanded=False
                     if new_data is not None:
                         save_state_for_undo()
                         st.session_state["data"] = new_data
-                        # persist
+                        # ensure new columns exist in imported file
+                        for col in ["Visited_Status", "Visited_At", "Registered_Status", "Registered_At"]:
+                            if col not in st.session_state["data"].columns:
+                                st.session_state["data"][col] = ""
                         st.session_state["data"].to_excel(DATA_FILE, index=False)
                         st.success(f"Loaded {len(new_data)} rows and saved to {DATA_FILE}!")
                         st.rerun()
@@ -314,15 +215,8 @@ with st.expander("🛠️ Data Management (Import / Add / Undo)", expanded=False
             with c6:
                 day = st.selectbox(
                     "Day",
-                    [
-                        "MONDAY",
-                        "TUESDAY",
-                        "WEDNESDAY",
-                        "THURSDAY",
-                        "FRIDAY",
-                        "SATURDAY",
-                        "SUNDAY",
-                    ],
+                    ["MONDAY", "TUESDAY", "WEDNESDAY",
+                     "THURSDAY", "FRIDAY", "SATURDAY", "SUNDAY"],
                 )
             with c7:
                 category = st.selectbox("Category", ["E", "M", "Other"])
@@ -375,13 +269,16 @@ with st.expander("🛠️ Data Management (Import / Add / Undo)", expanded=False
                         "HW302": "YES" if hw302 else "",
                         "HW310": "YES" if hw310 else "",
                         "other": other_notes,
+                        "Visited_Status": "",
+                        "Visited_At": "",
+                        "Registered_Status": "",
+                        "Registered_At": "",
                     }
 
                     st.session_state["data"] = pd.concat(
                         [st.session_state["data"], pd.DataFrame([new_row])],
                         ignore_index=True,
                     )
-                    # persist
                     st.session_state["data"].to_excel(DATA_FILE, index=False)
 
                     st.success("Entry added & saved!")
@@ -470,196 +367,126 @@ tab_cards, tab_graphs, tab_data = st.tabs(
     ["📇 Mason Cards", "📈 Analytics", "📝 Data Editor"]
 )
 
-# ----- CARDS TAB -----
+# ----- CARDS TAB (WITH ACTION BUTTONS) -----
 with tab_cards:
     st.subheader("Mason Directory")
 
-    if not df_display.empty:
-        # CSS + HTML together so it renders correctly (no Markdown)
-        css = """
-        <style>
-        .mason-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-            gap: 1.5rem;
-            margin-top: 1rem;
-        }
-        .mason-card {
-            background: #ffffff;
-            border-radius: 12px;
-            padding: 20px;
-            display: flex;
-            flex-direction: column;
-            border-top: 4px solid #4f46e5;
-            box-shadow: 0 10px 15px rgba(15, 23, 42, 0.08);
-            font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-        }
-        .mason-name {
-            font-size: 1.1rem;
-            font-weight: 700;
-            color: #0f172a;
-            margin-bottom: 4px;
-        }
-        .mason-code {
-            font-size: 0.8rem;
-            color: #64748b;
-            font-weight: 500;
-        }
-        .mason-tag {
-            font-size: 0.75rem;
-            padding: 3px 8px;
-            border-radius: 6px;
-            background: #f1f5f9;
-            color: #475569;
-        }
-        .mason-meta-row {
-            display: flex;
-            font-size: 0.85rem;
-            margin-top: 4px;
-        }
-        .mason-meta-label {
-            width: 80px;
-            font-weight: 600;
-            color: #64748b;
-        }
-        .mason-meta-value {
-            color: #0f172a;
-        }
-        .mason-day {
-            font-weight: 700;
-            color: #1d4ed8;
-        }
-        .mason-section-title {
-            margin-top: 8px;
-            font-size: 0.75rem;
-            text-transform: uppercase;
-            font-weight: 600;
-            color: #64748b;
-        }
-        .mason-products-empty {
-            font-size: 0.75rem;
-            font-style: italic;
-            color: #94a3b8;
-            margin-top: 2px;
-        }
-        .mason-call-btn {
-            margin-top: 12px;
-            width: 100%;
-            padding: 10px 16px;
-            border-radius: 8px;
-            background: #16a34a;
-            color: #ffffff;
-            font-size: 0.9rem;
-            font-weight: 600;
-            border: none;
-            text-align: center;
-            text-decoration: none;
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            cursor: pointer;
-            transition: background 0.15s ease;
-        }
-        .mason-call-btn:hover {
-            background: #15803d;
-        }
-        .mason-call-icon {
-            margin-right: 6px;
-        }
-        </style>
-        """
+    df_cards = df_display.copy()
 
-        # Build the cards HTML
-        html = css + '<div class="mason-grid">'
-
-        for _, row in df_display.iterrows():
-            name = row.get("MASON NAME", "Unknown")
+    if df_cards.empty:
+        st.info("No masons found matching filters.")
+    else:
+        for idx, row in df_cards.iterrows():
             code = row.get("MASON CODE", "N/A")
+            name = row.get("MASON NAME", "Unknown")
             cat = row.get("Category", "N/A") or "N/A"
-
             contact = str(row.get("CONTACT NUMBER", "")).replace(".0", "").strip()
             loc = row.get("Location", "") or "N/A"
             dlr = row.get("DLR NAME", "") or "N/A"
             day = row.get("DAY", "") or "N/A"
 
-            # Products
+            visited_status = row.get("Visited_Status", "")
+            registered_status = row.get("Registered_Status", "")
+
             hw_cols = ["HW305", "HW101", "Hw201", "HW103", "HW302", "HW310"]
-            product_badges = []
-            for p in hw_cols:
-                if p in row and isinstance(row[p], str) and "YES" in row[p].upper():
-                    product_badges.append(p.upper())
+            prod_list = [
+                p.upper()
+                for p in hw_cols
+                if p in row and isinstance(row[p], str) and "YES" in row[p].upper()
+            ]
 
-            if product_badges:
-                products_html = " ".join(
-                    f'<span class="mason-tag">{p}</span>' for p in product_badges
+            with st.container(border=True):
+                header_cols = st.columns([4, 1])
+                with header_cols[0]:
+                    st.markdown(f"**{name}**")
+                    st.caption(code)
+                with header_cols[1]:
+                    st.markdown(
+                        f"<div style='text-align:right;'><span style='font-size:0.75rem;padding:3px 8px;border-radius:6px;background:#f1f5f9;color:#475569;'>{cat}</span></div>",
+                        unsafe_allow_html=True,
+                    )
+
+                st.write(f"**Contact:**  {contact}")
+                st.write(f"**Location:**  {loc}")
+                st.write(f"**DLR:**  {dlr}")
+                st.write(f"**Day:**  :blue[{day}]")
+
+                st.write(
+                    "**Products:** "
+                    + (", ".join(prod_list) if prod_list else "_No products listed_")
                 )
-            else:
-                products_html = '<span class="mason-products-empty">No products listed</span>'
 
-            # Call button
-            if contact and contact.lower() != "nan" and contact != "":
-                call_html = f"""
-                <a href="tel:{contact}" class="mason-call-btn">
-                    <span class="mason-call-icon">📞</span> Call Now
-                </a>
-                """
-            else:
-                call_html = """
-                <button class="mason-call-btn" style="background:#cbd5f5;cursor:not-allowed;">
-                    No Contact
-                </button>
-                """
+                st.markdown("---")
 
-            card_html = f"""
-            <div class="mason-card">
-                <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px;">
-                    <div>
-                        <div class="mason-name">{name}</div>
-                        <div class="mason-code">{code}</div>
-                    </div>
-                    <span class="mason-tag">{cat}</span>
-                </div>
+                b_call, b_visit, b_reg = st.columns(3)
 
-                <div>
-                    <div class="mason-meta-row">
-                        <div class="mason-meta-label">Contact:</div>
-                        <div class="mason-meta-value">{contact}</div>
-                    </div>
-                    <div class="mason-meta-row">
-                        <div class="mason-meta-label">Location:</div>
-                        <div class="mason-meta-value">{loc}</div>
-                    </div>
-                    <div class="mason-meta-row">
-                        <div class="mason-meta-label">DLR:</div>
-                        <div class="mason-meta-value">{dlr}</div>
-                    </div>
-                    <div class="mason-meta-row">
-                        <div class="mason-meta-label">Day:</div>
-                        <div class="mason-meta-value mason-day">{day}</div>
-                    </div>
-                </div>
+                # CALL BUTTON (HTML link, color #813405)
+                with b_call:
+                    if contact and contact.lower() != "nan":
+                        st.markdown(
+                            f"""
+                            <a href="tel:{contact}" style="
+                                display:inline-flex;
+                                justify-content:center;
+                                align-items:center;
+                                width:100%;
+                                padding:0.5rem 0.9rem;
+                                border-radius:8px;
+                                background:#813405;
+                                color:#ffffff;
+                                font-weight:600;
+                                text-decoration:none;
+                            ">
+                                📲 Call
+                            </a>
+                            """,
+                            unsafe_allow_html=True,
+                        )
+                    else:
+                        st.markdown(
+                            """
+                            <div style="
+                                width:100%;
+                                padding:0.5rem 0.9rem;
+                                border-radius:8px;
+                                background:#cbd5f5;
+                                color:#4b5563;
+                                font-weight:600;
+                                text-align:center;
+                            ">
+                                No Contact
+                            </div>
+                            """,
+                            unsafe_allow_html=True,
+                        )
 
-                <hr style="border:none;border-top:1px solid #e2e8f0;margin:12px 0 6px 0;">
+                # VISITED BUTTON
+                with b_visit:
+                    label = "🧭 Visited" if not visited_status else "✅ Visited"
+                    if st.button(label, key=f"visit_{code}_{idx}"):
+                        save_state_for_undo()
+                        mask = st.session_state["data"]["MASON CODE"] == code
+                        st.session_state["data"].loc[mask, "Visited_Status"] = "Visited"
+                        st.session_state["data"].loc[mask, "Visited_At"] = datetime.now().strftime(
+                            "%Y-%m-%d %H:%M:%S"
+                        )
+                        st.session_state["data"].to_excel(DATA_FILE, index=False)
+                        st.success(f"Marked {name} as visited.")
+                        st.rerun()
 
-                <div>
-                    <div class="mason-section-title">Products:</div>
-                    <div style="margin-top:4px;">{products_html}</div>
-                </div>
-
-                {call_html}
-            </div>
-            """
-
-            html += card_html
-
-        html += "</div>"
-
-        # 🔥 Render HTML directly, no Markdown parsing
-        components.html(html, height=800, scrolling=True)
-    else:
-        st.info("No masons found matching filters.")
-
-
+                # REGISTERED BUTTON
+                with b_reg:
+                    label = "📝 Registered" if not registered_status else "✅ Registered"
+                    if st.button(label, key=f"reg_{code}_{idx}"):
+                        save_state_for_undo()
+                        mask = st.session_state["data"]["MASON CODE"] == code
+                        st.session_state["data"].loc[mask, "Registered_Status"] = "Registered"
+                        st.session_state["data"].loc[mask, "Registered_At"] = datetime.now().strftime(
+                            "%Y-%m-%d %H:%M:%S"
+                        )
+                        st.session_state["data"].to_excel(DATA_FILE, index=False)
+                        st.success(f"Marked {name} as registered.")
+                        st.rerun()
 
 # ----- ANALYTICS TAB -----
 with tab_graphs:
@@ -678,13 +505,10 @@ with tab_graphs:
         col3, col4 = st.columns(2)
         with col3:
             st.write("**Product Popularity**")
-            hw_cols = ["HW305", "HW101", "Hw201", "HW103", "HW302", "HW310"]
             available = [c for c in hw_cols if c in df_display.columns]
             if available:
                 counts = df_display[available].apply(
-                    lambda x: x.astype(str)
-                    .str.contains("YES", case=False)
-                    .sum()
+                    lambda x: x.astype(str).str.contains("YES", case=False).sum()
                 )
                 st.bar_chart(counts)
         with col4:
@@ -706,7 +530,6 @@ with tab_data:
         "HW310": st.column_config.TextColumn("HW310", width="small"),
     }
 
-    # Show the currently filtered data for editing
     edit_df = df_display.copy()
     if not edit_df.empty and "CONTACT NUMBER" in edit_df.columns:
         edit_df["CONTACT NUMBER"] = edit_df["CONTACT NUMBER"].astype(str)
@@ -721,7 +544,6 @@ with tab_data:
 
     st.write("---")
 
-    # ✅ Save back changes to MAIN DATA (session_state + Excel file)
     if st.button("💾 Save Changes to Main Data"):
         if "S.NO" in edited_df.columns and "S.NO" in st.session_state["data"].columns:
             save_state_for_undo()
@@ -729,16 +551,17 @@ with tab_data:
             updated = edited_df.set_index("S.NO")
             base.update(updated)
             st.session_state["data"] = base.reset_index()
-            # persist to Excel
             st.session_state["data"].to_excel(DATA_FILE, index=False)
             st.success("Changes saved to main dataset and Excel file!")
         else:
             st.error("Column 'S.NO' not found. Cannot map edited rows back to main data.")
 
-    # 🆕 Download FULL current report (not filtered)
     if not st.session_state["data"].empty:
         st.download_button(
             "📥 Download Full Current Report (All Masons)",
             to_excel(st.session_state["data"]),
             "mason_full_report.xlsx",
         )
+
+
+
