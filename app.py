@@ -311,14 +311,8 @@ with st.expander("🛠️ Data Management (Template / Add / Undo)", expanded=Fal
             st.experimental_rerun()
 
     c1, c2 = st.columns(2)
+    
     with c1:
-        st.write("**Template**")
-        st.download_button(
-            "📄 Download Blank Template",
-            get_template_excel(),
-            "mason_template.xlsx",
-        )
-    with c2:
         st.write("**Add Single Entry**")
         with st.form("add_form", clear_on_submit=True):
             a1, a2, a3 = st.columns(3)
@@ -385,6 +379,13 @@ with st.expander("🛠️ Data Management (Template / Add / Undo)", expanded=Fal
                     st.session_state["data"].to_excel(DATA_FILE, index=False)
                     st.success("Mason added & saved.")
                     st.experimental_rerun()
+    with c2:
+        st.write("**Template**")
+        st.download_button(
+            "📄 Download Blank Template",
+            get_template_excel(),
+            "mason_template.xlsx",
+        )
 
 # =============================================================
 # FILTERS – TRUE CASCADING / DYNAMIC
