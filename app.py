@@ -1,51 +1,81 @@
 import streamlit as st
 import pandas as pd
 from io import BytesIO
+from pathlib import Path
 
-# Set page configuration must be the first streamlit command
+# ------------ CONFIG ------------
 st.set_page_config(page_title="Mason Data Manager", layout="wide")
-
 st.title("Mason Data Management System")
 
-# --- TAILWIND CSS & CUSTOM STYLES ---
+DATA_FILE = "mason_data.xlsx"  # persistent storage file
+
+# ------------ TAILWIND & CSS ------------
 st.markdown("""
 <script src="https://cdn.tailwindcss.com"></script>
 <style>
-    .stMarkdown { width: 100%; }
-    ::-webkit-scrollbar { width: 8px; height: 8px; }
-    ::-webkit-scrollbar-track { background: #f1f1f1; }
-    ::-webkit-scrollbar-thumb { background: #c7c7c7; border-radius: 4px; }
-    ::-webkit-scrollbar-thumb:hover { background: #a8a8a8; }
-    .mason-grid { display: grid; grid-template-columns: repeat(1, minmax(0, 1fr)); gap: 1.5rem; }
-    @media (min-width: 768px) { .mason-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
-    @media (min-width: 1280px) { .mason-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+    .stMarkdown {
+        width: 100%;
+    }
+    ::-webkit-scrollbar {
+        width: 8px;
+        height: 8px;
+    }
+    ::-webkit-scrollbar-track {
+        background: #f1f1f1; 
+    }
+    ::-webkit-scrollbar-thumb {
+        background: #c7c7c7; 
+        border-radius: 4px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+        background: #a8a8a8; 
+    }
+    .mason-grid {
+        display: grid;
+        grid-template-columns: repeat(1, minmax(0, 1fr));
+        gap: 1.5rem;
+    }
+    @media (min-width: 768px) {
+        .mason-grid {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+    }
+    @media (min-width: 1280px) {
+        .mason-grid {
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+        }
+    }
 </style>
 """, unsafe_allow_html=True)
 
-# --- Helper Functions ---
+# ------------ HELPERS ------------
 
-def clean_dataframe(df):
-    """Standardizes dataframe: strips whitespace, handles NaNs"""
+def clean_dataframe(df: pd.DataFrame) -> pd.DataFrame:
+    """Standardizes dataframe: strips whitespace, handles NaNs, fixes S.NO."""
     df.columns = [str(c).strip() for c in df.columns]
     df = df.applymap(lambda x: x.strip() if isinstance(x, str) else x)
     df = df.fillna("")
     if "S.NO" in df.columns:
-        df["S.NO"] = pd.to_numeric(df["S.NO"], errors='coerce').fillna(0).astype(int)
+        df["S.NO"] = pd.to_numeric(df["S.NO"], errors="coerce").fillna(0).astype(int)
     return df
 
-def get_template_excel():
+
+def get_template_excel() -> bytes:
+    """Generates an empty template file with correct headers."""
     columns = [
-        "S.NO", "MASON CODE", "MASON NAME", "CONTACT NUMBER", 
-        "DLR NAME", "Location", "DAY", "Category", 
+        "S.NO", "MASON CODE", "MASON NAME", "CONTACT NUMBER",
+        "DLR NAME", "Location", "DAY", "Category",
         "HW305", "HW101", "Hw201", "HW103", "HW302", "HW310", "other"
     ]
     df_template = pd.DataFrame(columns=columns)
     output = BytesIO()
-    with pd.ExcelWriter(output, engine='openpyxl') as writer:
-        df_template.to_excel(writer, index=False, sheet_name='Template')
+    with pd.ExcelWriter(output, engine="openpyxl") as writer:
+        df_template.to_excel(writer, index=False, sheet_name="Template")
     return output.getvalue()
 
-def load_excel_data(uploaded_file):
+
+def load_excel_data(uploaded_file) -> pd.DataFrame | None:
+    """Helper to read excel."""
     try:
         df = pd.read_excel(uploaded_file)
         return clean_dataframe(df)
@@ -53,11 +83,31 @@ def load_excel_data(uploaded_file):
         st.error(f"Error loading file: {e}")
         return None
 
-def save_state_for_undo():
-    st.session_state['prev_data'] = st.session_state['data'].copy()
 
-# --- PRE-LOADED DATA ---
-def get_initial_dataset():
+def save_state_for_undo():
+    """Saves the current dataframe to history before making changes."""
+    st.session_state["prev_data"] = st.session_state["data"].copy()
+
+
+def to_excel(df: pd.DataFrame) -> bytes:
+    """Convert DF to Excel bytes."""
+    output = BytesIO()
+    with pd.ExcelWriter(output, engine="openpyxl") as writer:
+        df.to_excel(writer, index=False, sheet_name="MasonData")
+    return output.getvalue()
+
+
+# ------------ INITIAL DATA (HARD-CODED + PERSISTENCE) ------------
+
+def get_initial_dataset() -> pd.DataFrame:
+    """
+    1. If mason_data.xlsx exists -> load & return.
+    2. Else -> build from your big hardcoded dict, save to file, return.
+    """
+    if Path(DATA_FILE).exists():
+        df = pd.read_excel(DATA_FILE)
+        return clean_dataframe(df)
+
     data = {
         "S.NO": range(1, 216),
         "MASON CODE": ["M100258", "M100259", "M100260", "M100261", "M100262", "M100263", "M100264", "M100265", "M100266", "M100267", "M100268", "M100270", "M100271", "M100272", "M100273", "M100276", "M100290", "M103410", "M103411", "M103412", "M103413", "M103414", "M103415", "M103416", "M103417", "M103418", "M103419", "M103420", "M103421", "M103422", "M103423", "M103424", "M103425", "M103426", "M103411", "M103427", "M103429", "M104009", "M104011", "M104012", "M105830", "M105831", "M105835", "M106738", "M106739", "M106740", "M106741", "M106752", "M109420", "M112390", "M115196", "M115197", "M115198", "M115199", "M115200", "M115201", "M116145", "M119871", "M121996", "M123673", "M123689", "M129493", "M131585", "M131586", "M131587", "M131759", "M131760", "M131762", "M131916", "M132228", "M133092", "M133208", "M142615", "M144358", "M144601", "M146156", "M146159", "M146786", "M148793", "M149919", "M150738", "M151271", "M152371", "M152481", "M152661", "M152737", "M152857", "M153518", "M154050", "M154051", "M154753", "M154805", "M154848", "M154891", "M154994", "M155379", "M155380", "M155990", "M155995", "M156233", "M156476", "M156578", "M156800", "M157794", "M158421", "M158609", "M158901", "M159030", "M159036", "M159089", "M159008", "M159040", "M159143", "M159179", "M159221", "M159239", "M159495", "M159587", "M159588", "M159858", "M159866", "M156191", "M160161", "M160198", "M160442", "M160497", "M161240", "M161747", "M162303", "M162629", "M163111", "M163154", "M163263", "M163264", "M163299", "M163833", "M163849", "M163991", "M164049", "M164076", "M164217", "M164424", "M164685", "M164686", "M166022", "M166074", "M166076", "M166668", "M167243", "M167757", "M168106", "M168106", "M168677", "M168850", "M168963", "M169303", "M169393", "M169418", "M169600", "M169684", "M169685", "M169701", "M169703", "M169709", "M170017", "M171007", "M171434", "M171461", "M171484", "M172171", "M172592", "M172925", "M172926", "M176313", "M176331", "M176333", "M176334", "M176336", "M176424", "M176494", "M176512", "M176513", "M176514", "M176519", "M176520", "M176521", "M176528", "M176529", "M176530", "M176533", "M176544", "M176545", "M176551", "M176555", "M178257", "M178566", "M179206", "M179361", "M179767", "M180309", "M180889", "M181502", "M181503", "M181504", "M181505", "M181506", "M181507", "M181508", "M181509", "M181511", "M181512", "M182130", "M182217", "M182246", "M182392"],
@@ -73,51 +123,113 @@ def get_initial_dataset():
         "HW310": ["", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", ""],
         "other": ["", "", "", "", "", "", "", "", "", "", "", "", "YES", "YES", "", "", "", "", "", "SBR", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "Yes", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "YES", "YES", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "SBR", "", ""]
     }
-    # Create DataFrame robustly
-    df = pd.DataFrame({k: pd.Series(v) for k, v in data.items()})
-    return clean_dataframe(df)
 
-# --- Session State Initialization ---
-if 'data' not in st.session_state:
-    st.session_state['data'] = get_initial_dataset()
+    # Temporary minimal fallback to avoid crash if user forgets to paste:
+    st.warning("No DATA_FILE and no hardcoded data found. Using empty dataset.")
+    df = pd.DataFrame(columns=[
+        "S.NO", "MASON CODE", "MASON NAME", "CONTACT NUMBER",
+        "DLR NAME", "Location", "DAY", "Category",
+        "HW305", "HW101", "Hw201", "HW103", "HW302", "HW310", "other"
+    ])
+    return df
 
-if 'prev_data' not in st.session_state:
-    st.session_state['prev_data'] = None
 
-# --- TOP SECTION: Data Operations ---
+# ------------ SESSION STATE INIT ------------
+
+if "data" not in st.session_state:
+    st.session_state["data"] = get_initial_dataset()
+
+if "prev_data" not in st.session_state:
+    st.session_state["prev_data"] = None
+
+# ------------ DATA MANAGEMENT EXPANDER ------------
+
 with st.expander("🛠️ Data Management (Import / Add / Undo)", expanded=False):
-    if st.session_state['prev_data'] is not None:
+
+    # Undo
+    if st.session_state["prev_data"] is not None:
         if st.button("↩️ Undo Last Change", type="primary"):
-            st.session_state['data'] = st.session_state['prev_data']
-            st.session_state['prev_data'] = None 
+            st.session_state["data"] = st.session_state["prev_data"]
+            st.session_state["prev_data"] = None
+            # persist undo
+            st.session_state["data"].to_excel(DATA_FILE, index=False)
             st.success("Restored previous version!")
             st.rerun()
-    
-    # 1. REORDERED TABS: Add Single Entry first, then Import Excel
-    op_tab1, op_tab2 = st.tabs(["➕ Add Single Entry", "📂 Import Excel"])
-    
+
+    op_tab1, op_tab2 = st.tabs(["📂 Import Excel", "➕ Add Single Entry"])
+
+    # --- IMPORT TAB ---
     with op_tab1:
+        col1, col2 = st.columns(2)
+        with col1:
+            st.info("Step 1: Download Template")
+            st.download_button(
+                label="📄 Download Blank Excel Template",
+                data=get_template_excel(),
+                file_name="mason_data_template.xlsx",
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            )
+        with col2:
+            st.info("Step 2: Upload Data")
+            uploaded_file = st.file_uploader("Upload Excel File", type=["xlsx", "xls"])
+            if uploaded_file is not None:
+                if st.button("Load Data"):
+                    new_data = load_excel_data(uploaded_file)
+                    if new_data is not None:
+                        save_state_for_undo()
+                        st.session_state["data"] = new_data
+                        # persist
+                        st.session_state["data"].to_excel(DATA_FILE, index=False)
+                        st.success(f"Loaded {len(new_data)} rows and saved to {DATA_FILE}!")
+                        st.rerun()
+
+    # --- ADD ENTRY TAB ---
+    with op_tab2:
         with st.form("entry_form"):
             c1, c2, c3 = st.columns(3)
-            with c1: mason_code = st.text_input("Mason Code")
-            with c2: mason_name = st.text_input("Mason Name")
-            with c3: contact_number = st.text_input("Contact Number")
-            
+            with c1:
+                mason_code = st.text_input("Mason Code")
+            with c2:
+                mason_name = st.text_input("Mason Name")
+            with c3:
+                contact_number = st.text_input("Contact Number")
+
             c4, c5, c6, c7 = st.columns(4)
-            with c4: dlr_name = st.text_input("DLR Name")
-            with c5: location = st.text_input("Location")
-            with c6: day = st.selectbox("Day", ["MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY", "SATURDAY", "SUNDAY"])
-            with c7: category = st.selectbox("Category", ["E", "M", "Other"])
-            
+            with c4:
+                dlr_name = st.text_input("DLR Name")
+            with c5:
+                location = st.text_input("Location")
+            with c6:
+                day = st.selectbox(
+                    "Day",
+                    [
+                        "MONDAY",
+                        "TUESDAY",
+                        "WEDNESDAY",
+                        "THURSDAY",
+                        "FRIDAY",
+                        "SATURDAY",
+                        "SUNDAY",
+                    ],
+                )
+            with c7:
+                category = st.selectbox("Category", ["E", "M", "Other"])
+
             st.write("**Products (Check box for YES)**")
             pc1, pc2, pc3, pc4, pc5, pc6 = st.columns(6)
-            with pc1: hw305 = st.checkbox("HW305")
-            with pc2: hw101 = st.checkbox("HW101")
-            with pc3: hw201 = st.checkbox("Hw201")
-            with pc4: hw103 = st.checkbox("HW103")
-            with pc5: hw302 = st.checkbox("HW302")
-            with pc6: hw310 = st.checkbox("HW310")
-            
+            with pc1:
+                hw305 = st.checkbox("HW305")
+            with pc2:
+                hw101 = st.checkbox("HW101")
+            with pc3:
+                hw201 = st.checkbox("Hw201")
+            with pc4:
+                hw103 = st.checkbox("HW103")
+            with pc5:
+                hw302 = st.checkbox("HW302")
+            with pc6:
+                hw310 = st.checkbox("HW310")
+
             other_notes = st.text_input("Other / Remarks")
             submitted = st.form_submit_button("Add Line Item")
 
@@ -126,141 +238,157 @@ with st.expander("🛠️ Data Management (Import / Add / Undo)", expanded=False
                     st.error("Mason Name is required!")
                 else:
                     save_state_for_undo()
-                    new_sno = len(st.session_state['data']) + 1 if 'S.NO' in st.session_state['data'].columns else 1
+                    if "S.NO" in st.session_state["data"].columns:
+                        new_sno = (
+                            st.session_state["data"]["S.NO"].max() + 1
+                            if not st.session_state["data"].empty
+                            else 1
+                        )
+                    else:
+                        new_sno = 1
+
                     new_row = {
-                        "S.NO": new_sno, "MASON CODE": mason_code, "MASON NAME": mason_name, "CONTACT NUMBER": contact_number,
-                        "DLR NAME": dlr_name, "Location": location, "DAY": day, "Category": category,
-                        "HW305": "YES" if hw305 else "", "HW101": "YES" if hw101 else "", "Hw201": "YES" if hw201 else "",
-                        "HW103": "YES" if hw103 else "", "HW302": "YES" if hw302 else "", "HW310": "YES" if hw310 else "",
-                        "other": other_notes
+                        "S.NO": new_sno,
+                        "MASON CODE": mason_code,
+                        "MASON NAME": mason_name,
+                        "CONTACT NUMBER": contact_number,
+                        "DLR NAME": dlr_name,
+                        "Location": location,
+                        "DAY": day,
+                        "Category": category,
+                        "HW305": "YES" if hw305 else "",
+                        "HW101": "YES" if hw101 else "",
+                        "Hw201": "YES" if hw201 else "",
+                        "HW103": "YES" if hw103 else "",
+                        "HW302": "YES" if hw302 else "",
+                        "HW310": "YES" if hw310 else "",
+                        "other": other_notes,
                     }
-                    # 4. DATA PERSISTENCE: This updates the main session state, persisting across reruns
-                    st.session_state['data'] = pd.concat([st.session_state['data'], pd.DataFrame([new_row])], ignore_index=True)
-                    st.success("Entry added!")
+
+                    st.session_state["data"] = pd.concat(
+                        [st.session_state["data"], pd.DataFrame([new_row])],
+                        ignore_index=True,
+                    )
+                    # persist
+                    st.session_state["data"].to_excel(DATA_FILE, index=False)
+
+                    st.success("Entry added & saved!")
                     st.rerun()
 
-    with op_tab2:
-        col1, col2 = st.columns(2)
-        with col1:
-            st.info("Step 1: Download Template")
-            st.download_button(
-                label="📄 Download Blank Excel Template",
-                data=get_template_excel(),
-                file_name='mason_data_template.xlsx',
-                mime='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
-            )
-            # 2. ADDED INSTRUCTION TEXT
-            st.caption("Use this blank template to add data.")
-        with col2:
-            st.info("Step 2: Upload Data")
-            uploaded_file = st.file_uploader("Upload Excel File", type=['xlsx', 'xls'])
-            if uploaded_file is not None:
-                if st.button("Load Data"):
-                    new_data = load_excel_data(uploaded_file)
-                    if new_data is not None:
-                        save_state_for_undo()
-                        st.session_state['data'] = new_data
-                        st.success(f"Loaded {len(new_data)} rows!")
-                        st.rerun()
+# ------------ FILTER SECTION ------------
 
-# --- 3. DYNAMIC FILTER SECTION ---
 with st.expander("🔍 Filter Data", expanded=True):
-    # Start with the full dataset
-    df_filtered = st.session_state['data'].copy()
-    
-    # 4 Columns for Filters
+    df_display = st.session_state["data"].copy()
+
     fc1, fc2, fc3, fc4 = st.columns(4)
-    
-    # Filter 1: Location
+
     with fc1:
-        locs = [str(x) for x in df_filtered["Location"].unique() if x]
+        locs = [str(x) for x in df_display.get("Location", "").unique() if str(x)]
         locations = ["All"] + sorted(locs)
         selected_location = st.selectbox("📍 Location", locations)
-        
-        # Apply Location Filter IMMEDIATELY so subsequent filters are relevant
-        if selected_location != "All":
-            df_filtered = df_filtered[df_filtered["Location"] == selected_location]
 
-    # Filter 2: Day (Dynamic options based on filtered data)
     with fc2:
-        days_list = [str(x) for x in df_filtered["DAY"].unique() if x]
+        days_list = [str(x) for x in df_display.get("DAY", "").unique() if str(x)]
         days = ["All"] + sorted(days_list)
         selected_day = st.selectbox("📅 Day", days)
-        
-        # Apply Day Filter
-        if selected_day != "All":
-            df_filtered = df_filtered[df_filtered["DAY"] == selected_day]
 
-    # Filter 3: Category (Dynamic options)
     with fc3:
-        cats_raw = [str(x) for x in df_filtered["Category"].unique() if pd.notna(x) and str(x).strip() != '']
+        cats_raw = [
+            str(x)
+            for x in df_display.get("Category", "").unique()
+            if pd.notna(x) and str(x).strip() != ""
+        ]
         cats = ["All"] + sorted(cats_raw) + ["Blank / Uncategorized"]
         selected_cat = st.selectbox("🏷️ Category", cats)
-        
-        # Apply Category Filter
-        if selected_cat == "Blank / Uncategorized":
-            df_filtered = df_filtered[df_filtered["Category"].isna() | (df_filtered["Category"] == "")]
-        elif selected_cat != "All":
-            df_filtered = df_filtered[df_filtered["Category"] == selected_cat]
 
-    # Filter 4: Products
     with fc4:
         st.write("**Product Visibility**")
         show_only_products = st.checkbox("Has Products")
         show_no_products = st.checkbox("No Products")
-        
-        hw_cols = ["HW305", "HW101", "Hw201", "HW103", "HW302", "HW310"]
-        if show_only_products:
-            mask = df_filtered[hw_cols].apply(lambda x: x.astype(str).str.contains('YES', case=False).any(), axis=1)
-            df_filtered = df_filtered[mask]
-        if show_no_products:
-            mask = df_filtered[hw_cols].apply(lambda x: not x.astype(str).str.contains('YES', case=False).any(), axis=1)
-            df_filtered = df_filtered[mask]
 
-# Now df_filtered is the final result of the cascade
-df_display = df_filtered
+# Apply filters
+if not df_display.empty:
+    if selected_location != "All":
+        df_display = df_display[df_display["Location"] == selected_location]
 
-# --- Metrics Section ---
+    if selected_day != "All":
+        df_display = df_display[df_display["DAY"] == selected_day]
+
+    if selected_cat == "Blank / Uncategorized":
+        df_display = df_display[
+            df_display["Category"].isna() | (df_display["Category"] == "")
+        ]
+    elif selected_cat != "All":
+        df_display = df_display[df_display["Category"] == selected_cat]
+
+    hw_cols = ["HW305", "HW101", "Hw201", "HW103", "HW302", "HW310"]
+
+    if show_only_products:
+        mask = df_display[hw_cols].apply(
+            lambda x: x.astype(str).str.contains("YES", case=False).any(), axis=1
+        )
+        df_display = df_display[mask]
+
+    if show_no_products:
+        mask = df_display[hw_cols].apply(
+            lambda x: not x.astype(str).str.contains("YES", case=False).any(), axis=1
+        )
+        df_display = df_display[mask]
+
+# ------------ METRICS ------------
+
 st.markdown("### 📊 Dashboard Overview")
 m1, m2, m3, m4 = st.columns(4)
-m1.metric("Total Masons", len(st.session_state['data']))
+m1.metric("Total Masons", len(st.session_state["data"]))
 m2.metric("Visible Rows", len(df_display))
-m3.metric("Unique Locations", df_display["Location"].nunique() if "Location" in df_display.columns else 0)
-m4.metric("Unique DLRs", df_display["DLR NAME"].nunique() if "DLR NAME" in df_display.columns else 0)
+m3.metric(
+    "Unique Locations",
+    df_display["Location"].nunique() if "Location" in df_display.columns else 0,
+)
+m4.metric(
+    "Unique DLRs",
+    df_display["DLR NAME"].nunique() if "DLR NAME" in df_display.columns else 0,
+)
 
 st.divider()
 
-# --- Main Tabs ---
-tab_cards, tab_graphs, tab_data = st.tabs(["📇 Mason Cards", "📈 Analytics", "📝 Data Editor"])
+# ------------ MAIN TABS ------------
 
+tab_cards, tab_graphs, tab_data = st.tabs(
+    ["📇 Mason Cards", "📈 Analytics", "📝 Data Editor"]
+)
+
+# ----- CARDS TAB -----
 with tab_cards:
     if not df_display.empty:
         html_content = '<div class="mason-grid">'
-        
-        for index, row in df_display.iterrows():
+        for _, row in df_display.iterrows():
             name = row.get("MASON NAME", "Unknown")
             code = row.get("MASON CODE", "N/A")
-            cat = row.get("Category", "N/A")
-            if not cat: cat = "N/A"
-            
+            cat = row.get("Category", "N/A") or "N/A"
             contact = str(row.get("CONTACT NUMBER", "")).replace(".0", "").strip()
             loc = row.get("Location", "")
             dlr = row.get("DLR NAME", "")
             day = row.get("DAY", "")
-            
+
+            # product badges
             products_html = ""
             hw_cols = ["HW305", "HW101", "Hw201", "HW103", "HW302", "HW310"]
             has_prod = False
             for p in hw_cols:
-                if p in row and isinstance(row[p], str) and 'YES' in row[p].upper():
+                if p in row and isinstance(row[p], str) and "YES" in row[p].upper():
                     p_clean = p.upper()
                     products_html += f'<span class="inline-block bg-indigo-100 text-indigo-800 text-xs font-medium px-2.5 py-0.5 rounded-full border border-indigo-200 mr-1 mb-1">{p_clean}</span>'
                     has_prod = True
-            
-            if not has_prod:
-                products_html = '<span class="text-xs text-slate-400 italic">No products listed</span>'
 
-            if contact and contact.lower() != "nan" and contact != "":
+            if not has_prod:
+                products_html = (
+                    '<span class="text-xs text-slate-400 italic">'
+                    "No products listed</span>"
+                )
+
+            # call btn
+            if contact and contact.lower() != "nan":
                 call_btn = f"""
                 <a href="tel:{contact}" class="inline-flex items-center justify-center w-full px-4 py-2 bg-green-600 hover:bg-green-700 text-white text-sm font-medium rounded-md transition-colors mt-3 no-underline">
                     <span class="mr-2">📞</span> Call Now
@@ -298,22 +426,25 @@ with tab_cards:
             </div>
             """
             html_content += card
-            
+
         html_content += "</div>"
         st.markdown(html_content, unsafe_allow_html=True)
     else:
         st.info("No masons found matching filters.")
 
+# ----- ANALYTICS TAB -----
 with tab_graphs:
     st.subheader("Visual Analytics")
     if not df_display.empty:
         col1, col2 = st.columns(2)
         with col1:
             st.write("**Masons per Location**")
-            if "Location" in df_display.columns: st.bar_chart(df_display["Location"].value_counts())
+            if "Location" in df_display.columns:
+                st.bar_chart(df_display["Location"].value_counts())
         with col2:
             st.write("**Masons per Day**")
-            if "DAY" in df_display.columns: st.bar_chart(df_display["DAY"].value_counts())
+            if "DAY" in df_display.columns:
+                st.bar_chart(df_display["DAY"].value_counts())
 
         col3, col4 = st.columns(2)
         with col3:
@@ -321,16 +452,23 @@ with tab_graphs:
             hw_cols = ["HW305", "HW101", "Hw201", "HW103", "HW302", "HW310"]
             available = [c for c in hw_cols if c in df_display.columns]
             if available:
-                counts = df_display[available].apply(lambda x: x.astype(str).str.contains('YES', case=False).sum())
+                counts = df_display[available].apply(
+                    lambda x: x.astype(str)
+                    .str.contains("YES", case=False)
+                    .sum()
+                )
                 st.bar_chart(counts)
         with col4:
             st.write("**Category Distribution**")
-            if "Category" in df_display.columns: st.bar_chart(df_display["Category"].value_counts())
+            if "Category" in df_display.columns:
+                st.bar_chart(df_display["Category"].value_counts())
 
+# ----- DATA EDITOR TAB -----
 with tab_data:
     st.subheader("Raw Data Table (Editable)")
+
     column_config = {
-        "CONTACT NUMBER": st.column_config.LinkColumn("Contact", display_text=r"(\+?[0-9]*)"),
+        "CONTACT NUMBER": st.column_config.TextColumn("Contact"),
         "HW305": st.column_config.TextColumn("HW305", width="small"),
         "HW101": st.column_config.TextColumn("HW101", width="small"),
         "Hw201": st.column_config.TextColumn("Hw201", width="small"),
@@ -338,25 +476,39 @@ with tab_data:
         "HW302": st.column_config.TextColumn("HW302", width="small"),
         "HW310": st.column_config.TextColumn("HW310", width="small"),
     }
-    if not df_display.empty and "CONTACT NUMBER" in df_display.columns:
-        df_display["CONTACT NUMBER"] = df_display["CONTACT NUMBER"].astype(str)
 
-    # 5. DATA PERSISTENCE in Table: Capture edits
-    # NOTE: Direct editing of filtered views back to session state is complex. 
-    # This editor view updates the DISPLAYED data but saving changes back requires a full re-map.
-    # For now, we allow viewing. The primary addition method is the form.
-    edited_df = st.data_editor(df_display, num_rows="dynamic", use_container_width=True, height=500, column_config=column_config)
+    edit_df = df_display.copy()
+    if not edit_df.empty and "CONTACT NUMBER" in edit_df.columns:
+        edit_df["CONTACT NUMBER"] = edit_df["CONTACT NUMBER"].astype(str)
+
+    edited_df = st.data_editor(
+        edit_df,
+        num_rows="dynamic",
+        use_container_width=True,
+        height=500,
+        column_config=column_config,
+    )
 
     st.write("---")
-    # 3. EXPORT ALL DATA: Export st.session_state['data'], NOT df_display
-    def to_excel(df):
-        output = BytesIO()
-        with pd.ExcelWriter(output, engine='openpyxl') as writer:
-            df.to_excel(writer, index=False, sheet_name='MasonData')
-        return output.getvalue()
-    
-    st.download_button(
-        "📥 Export All Data (Includes New Entries)", 
-        to_excel(st.session_state['data']), 
-        'mason_data_export.xlsx'
-    )
+
+    # Save back changes button
+    if st.button("💾 Save Changes to Main Data"):
+        if "S.NO" in edited_df.columns and "S.NO" in st.session_state["data"].columns:
+            save_state_for_undo()
+            base = st.session_state["data"].set_index("S.NO")
+            updated = edited_df.set_index("S.NO")
+            base.update(updated)
+            st.session_state["data"] = base.reset_index()
+            # persist to Excel
+            st.session_state["data"].to_excel(DATA_FILE, index=False)
+            st.success("Changes saved to main dataset and Excel file!")
+        else:
+            st.error("Column 'S.NO' not found. Cannot map edited rows back to main data.")
+
+    # Export filtered data
+    if not df_display.empty:
+        st.download_button(
+            "📥 Export Filtered Data to Excel",
+            to_excel(df_display),
+            "mason_data_export.xlsx",
+        )
