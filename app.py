@@ -2,12 +2,12 @@ import streamlit as st
 import pandas as pd
 from io import BytesIO
 
-# Set page configuration
+# Set page configuration must be the first streamlit command
 st.set_page_config(page_title="Mason Data Manager", layout="wide")
 
 st.title("Mason Data Management System")
 
-# --- CUSTOM CSS FOR MASON CARDS (The "HTML Things") ---
+# --- CUSTOM CSS FOR MASON CARDS ---
 st.markdown("""
 <style>
     /* Card Container Grid */
@@ -175,62 +175,63 @@ if 'data' not in st.session_state:
 if 'prev_data' not in st.session_state:
     st.session_state['prev_data'] = None
 
-# --- Sidebar: Controls & Entry ---
-with st.sidebar:
-    st.title("Controls")
+# --- TOP SECTION: Data Operations (Collapsible) ---
+with st.expander("🛠️ Data Management (Import / Add / Undo)", expanded=False):
     
-    st.subheader("1. Get Template")
-    st.download_button(
-        label="📄 Download Blank Excel Template",
-        data=get_template_excel(),
-        file_name='mason_data_template.xlsx',
-        mime='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
-    )
-    
-    st.divider()
-
-    st.subheader("2. Import Data")
-    uploaded_file = st.file_uploader("Upload Excel File", type=['xlsx', 'xls'])
-    if uploaded_file is not None:
-        if st.button("Load Data"):
-            new_data = load_excel_data(uploaded_file)
-            if new_data is not None:
-                save_state_for_undo()
-                st.session_state['data'] = new_data
-                st.success(f"Loaded {len(new_data)} rows!")
-                st.rerun()
-
+    # Global Undo Button (Visible if history exists)
     if st.session_state['prev_data'] is not None:
-        st.write("---")
-        if st.button("↩️ Undo Last Change"):
+        if st.button("↩️ Undo Last Change", type="primary"):
             st.session_state['data'] = st.session_state['prev_data']
             st.session_state['prev_data'] = None 
             st.success("Restored previous version!")
             st.rerun()
-
-    st.divider()
-
-    with st.expander("➕ Add Single Entry"):
+    
+    # Tabs for Operations
+    op_tab1, op_tab2 = st.tabs(["📂 Import Excel", "➕ Add Single Entry"])
+    
+    with op_tab1:
+        col1, col2 = st.columns(2)
+        with col1:
+            st.info("Step 1: Download Template")
+            st.download_button(
+                label="📄 Download Blank Excel Template",
+                data=get_template_excel(),
+                file_name='mason_data_template.xlsx',
+                mime='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+            )
+        with col2:
+            st.info("Step 2: Upload Data")
+            uploaded_file = st.file_uploader("Upload Excel File", type=['xlsx', 'xls'])
+            if uploaded_file is not None:
+                if st.button("Load Data"):
+                    new_data = load_excel_data(uploaded_file)
+                    if new_data is not None:
+                        save_state_for_undo()
+                        st.session_state['data'] = new_data
+                        st.success(f"Loaded {len(new_data)} rows!")
+                        st.rerun()
+    
+    with op_tab2:
         with st.form("entry_form"):
-            mason_code = st.text_input("Mason Code")
-            mason_name = st.text_input("Mason Name")
-            contact_number = st.text_input("Contact Number")
-            dlr_name = st.text_input("DLR Name")
-            location = st.text_input("Location")
+            c1, c2, c3 = st.columns(3)
+            with c1: mason_code = st.text_input("Mason Code")
+            with c2: mason_name = st.text_input("Mason Name")
+            with c3: contact_number = st.text_input("Contact Number")
             
-            day = st.selectbox("Day", ["MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY", "SATURDAY", "SUNDAY"])
-            category = st.selectbox("Category", ["E", "M", "Other"])
+            c4, c5, c6, c7 = st.columns(4)
+            with c4: dlr_name = st.text_input("DLR Name")
+            with c5: location = st.text_input("Location")
+            with c6: day = st.selectbox("Day", ["MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY", "SATURDAY", "SUNDAY"])
+            with c7: category = st.selectbox("Category", ["E", "M", "Other"])
             
-            st.write("**Products (YES/NO)**")
-            c1, c2 = st.columns(2)
-            with c1:
-                hw305 = st.checkbox("HW305")
-                hw101 = st.checkbox("HW101")
-                hw201 = st.checkbox("Hw201")
-            with c2:
-                hw103 = st.checkbox("HW103")
-                hw302 = st.checkbox("HW302")
-                hw310 = st.checkbox("HW310")
+            st.write("**Products (Check box for YES)**")
+            pc1, pc2, pc3, pc4, pc5, pc6 = st.columns(6)
+            with pc1: hw305 = st.checkbox("HW305")
+            with pc2: hw101 = st.checkbox("HW101")
+            with pc3: hw201 = st.checkbox("Hw201")
+            with pc4: hw103 = st.checkbox("HW103")
+            with pc5: hw302 = st.checkbox("HW302")
+            with pc6: hw310 = st.checkbox("HW310")
             
             other_notes = st.text_input("Other / Remarks")
             submitted = st.form_submit_button("Add Line Item")
@@ -252,24 +253,32 @@ with st.sidebar:
                     st.success("Entry added!")
                     st.rerun()
 
-    st.divider()
-    
-    st.subheader("🔍 Filters")
+# --- FILTER SECTION (Collapsible) ---
+with st.expander("🔍 Filter Data", expanded=True):
+    # Prepare Data for Filters
     df_display = st.session_state['data'].copy()
     
-    locations = ["All"] + sorted(list(df_display["Location"].unique())) if "Location" in df_display.columns else ["All"]
-    selected_location = st.selectbox("Filter by Location", locations)
+    # 4 Columns for Filters
+    fc1, fc2, fc3, fc4 = st.columns(4)
     
-    days = ["All"] + sorted(list(df_display["DAY"].unique())) if "DAY" in df_display.columns else ["All"]
-    selected_day = st.selectbox("Filter by Day", days)
+    with fc1:
+        locations = ["All"] + sorted(list(df_display["Location"].unique())) if "Location" in df_display.columns else ["All"]
+        selected_location = st.selectbox("📍 Location", locations)
+        
+    with fc2:
+        days = ["All"] + sorted(list(df_display["DAY"].unique())) if "DAY" in df_display.columns else ["All"]
+        selected_day = st.selectbox("📅 Day", days)
+        
+    with fc3:
+        cats = ["All"] + sorted(list(df_display["Category"].unique())) if "Category" in df_display.columns else ["All"]
+        selected_cat = st.selectbox("🏷️ Category", cats)
+        
+    with fc4:
+        st.write("**Product Visibility**")
+        show_only_products = st.checkbox("Has Products")
+        show_no_products = st.checkbox("No Products")
 
-    cats = ["All"] + sorted(list(df_display["Category"].unique())) if "Category" in df_display.columns else ["All"]
-    selected_cat = st.selectbox("Filter by Category", cats)
-
-    show_only_products = st.checkbox("Show only with Products")
-    show_no_products = st.checkbox("Show only with NO Products")
-
-# --- Filter Logic ---
+# --- Apply Filters Logic ---
 if not df_display.empty:
     if selected_location != "All": df_display = df_display[df_display["Location"] == selected_location]
     if selected_day != "All": df_display = df_display[df_display["DAY"] == selected_day]
@@ -283,17 +292,17 @@ if not df_display.empty:
         mask = df_display[hw_cols].apply(lambda x: not x.astype(str).str.contains('YES', case=False).any(), axis=1)
         df_display = df_display[mask]
 
-# --- Metrics ---
-st.write("### 📊 Overview")
+# --- Metrics Section ---
+st.markdown("### 📊 Dashboard Overview")
 m1, m2, m3, m4 = st.columns(4)
 m1.metric("Total Masons", len(st.session_state['data']))
 m2.metric("Visible Rows", len(df_display))
 m3.metric("Unique Locations", df_display["Location"].nunique() if "Location" in df_display.columns else 0)
 m4.metric("Unique DLRs", df_display["DLR NAME"].nunique() if "DLR NAME" in df_display.columns else 0)
 
-st.write("---")
+st.divider()
 
-# --- Tabs (Added Mason Cards Tab) ---
+# --- Main Tabs ---
 tab_cards, tab_graphs, tab_data = st.tabs(["📇 Mason Cards", "📈 Analytics", "📝 Data Editor"])
 
 with tab_cards:
