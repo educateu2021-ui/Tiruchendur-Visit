@@ -1,4 +1,5 @@
 import streamlit.components.v1 as components
+import textwrap
 import streamlit as st
 import pandas as pd
 from io import BytesIO
@@ -471,6 +472,9 @@ tab_cards, tab_graphs, tab_data = st.tabs(
 
 import streamlit.components.v1 as components  # at top of file
 
+import streamlit.components.v1 as components  # if not already imported
+import textwrap
+
 # ----- CARDS TAB -----
 with tab_cards:
     st.subheader("Mason Directory")
@@ -505,65 +509,65 @@ with tab_cards:
             # Call button
             if contact and contact.lower() != "nan":
                 call_html = f'''
-                    <a href="tel:{contact}" class="mason-call-btn">
-                        <span class="mason-call-icon">📞</span> Call Now
-                    </a>
-                '''
+<a href="tel:{contact}" class="mason-call-btn">
+  <span class="mason-call-icon">📞</span> Call Now
+</a>'''
             else:
                 call_html = '''
-                    <button class="mason-call-btn" style="background:#cbd5f5;cursor:not-allowed;">
-                        No Contact
-                    </button>
-                '''
+<button class="mason-call-btn" style="background:#cbd5f5;cursor:not-allowed;">
+  No Contact
+</button>'''
 
-            card_html = f"""
+            # ❗ Use textwrap.dedent so lines don't start with 12 spaces
+            card_html = textwrap.dedent(f"""
             <div class="mason-card">
-                <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px;">
-                    <div>
-                        <div class="mason-name">{name}</div>
-                        <div class="mason-code">{code}</div>
-                    </div>
-                    <span class="mason-tag">{cat}</span>
-                </div>
-
+              <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px;">
                 <div>
-                    <div class="mason-meta-row">
-                        <div class="mason-meta-label">Contact:</div>
-                        <div class="mason-meta-value">{contact}</div>
-                    </div>
-                    <div class="mason-meta-row">
-                        <div class="mason-meta-label">Location:</div>
-                        <div class="mason-meta-value">{loc}</div>
-                    </div>
-                    <div class="mason-meta-row">
-                        <div class="mason-meta-label">DLR:</div>
-                        <div class="mason-meta-value">{dlr}</div>
-                    </div>
-                    <div class="mason-meta-row">
-                        <div class="mason-meta-label">Day:</div>
-                        <div class="mason-meta-value mason-day">{day}</div>
-                    </div>
+                  <div class="mason-name">{name}</div>
+                  <div class="mason-code">{code}</div>
                 </div>
+                <span class="mason-tag">{cat}</span>
+              </div>
 
-                <hr style="border:none;border-top:1px solid #e2e8f0;margin:12px 0 6px 0;">
-
-                <div>
-                    <div class="mason-section-title">Products:</div>
-                    <div style="margin-top:4px;">{products_html}</div>
+              <div>
+                <div class="mason-meta-row">
+                  <div class="mason-meta-label">Contact:</div>
+                  <div class="mason-meta-value">{contact}</div>
                 </div>
+                <div class="mason-meta-row">
+                  <div class="mason-meta-label">Location:</div>
+                  <div class="mason-meta-value">{loc}</div>
+                </div>
+                <div class="mason-meta-row">
+                  <div class="mason-meta-label">DLR:</div>
+                  <div class="mason-meta-value">{dlr}</div>
+                </div>
+                <div class="mason-meta-row">
+                  <div class="mason-meta-label">Day:</div>
+                  <div class="mason-meta-value mason-day">{day}</div>
+                </div>
+              </div>
 
-                {call_html}
+              <hr style="border:none;border-top:1px solid #e2e8f0;margin:12px 0 6px 0;">
+
+              <div>
+                <div class="mason-section-title">Products:</div>
+                <div style="margin-top:4px;">{products_html}</div>
+              </div>
+
+              {call_html}
             </div>
-            """
+            """)
 
             html += card_html
 
         html += "</div>"
 
-        # Render inside Streamlit (no script, just HTML+CSS)
+        # Render HTML (no Markdown code-blocks now)
         st.markdown(html, unsafe_allow_html=True)
     else:
         st.info("No masons found matching filters.")
+
 
 
 # ----- ANALYTICS TAB -----
