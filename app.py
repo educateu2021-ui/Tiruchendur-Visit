@@ -1,3 +1,4 @@
+import streamlit.components.v1 as components
 import streamlit as st
 import pandas as pd
 from io import BytesIO
@@ -361,7 +362,9 @@ tab_cards, tab_graphs, tab_data = st.tabs(
 # ----- CARDS TAB -----
 with tab_cards:
     if not df_display.empty:
-        html_content = '<div class="mason-grid">'
+        html_content = """
+        <div class="mason-grid">
+        """
         for _, row in df_display.iterrows():
             name = row.get("MASON NAME", "Unknown")
             code = row.get("MASON CODE", "N/A")
@@ -378,16 +381,21 @@ with tab_cards:
             for p in hw_cols:
                 if p in row and isinstance(row[p], str) and "YES" in row[p].upper():
                     p_clean = p.upper()
-                    products_html += f'<span class="inline-block bg-indigo-100 text-indigo-800 text-xs font-medium px-2.5 py-0.5 rounded-full border border-indigo-200 mr-1 mb-1">{p_clean}</span>'
+                    products_html += f'''
+                        <span class="inline-block bg-indigo-100 text-indigo-800 text-xs font-medium px-2.5 py-0.5 rounded-full border border-indigo-200 mr-1 mb-1">
+                            {p_clean}
+                        </span>
+                    '''
                     has_prod = True
 
             if not has_prod:
-                products_html = (
-                    '<span class="text-xs text-slate-400 italic">'
-                    "No products listed</span>"
-                )
+                products_html = '''
+                    <span class="text-xs text-slate-400 italic">
+                        No products listed
+                    </span>
+                '''
 
-            # call btn
+            # Call button
             if contact and contact.lower() != "nan":
                 call_btn = f"""
                 <a href="tel:{contact}" class="inline-flex items-center justify-center w-full px-4 py-2 bg-green-600 hover:bg-green-700 text-white text-sm font-medium rounded-md transition-colors mt-3 no-underline">
@@ -428,7 +436,9 @@ with tab_cards:
             html_content += card
 
         html_content += "</div>"
-        st.markdown(html_content, unsafe_allow_html=True)
+
+        # 🔥 Use components.html so HTML is rendered properly
+        components.html(html_content, height=800, scrolling=True)
     else:
         st.info("No masons found matching filters.")
 
