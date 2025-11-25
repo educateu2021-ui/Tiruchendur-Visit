@@ -203,7 +203,15 @@ def get_initial_dataset() -> pd.DataFrame:
     return df
 
 
+with st.container():
+    st.markdown('<div class="filter-card">', unsafe_allow_html=True)
 
+    head_l, head_r = st.columns([6, 1])
+    with head_l:
+        st.subheader("Filters")
+    with head_r:
+        if st.button("🔄 Reset Filters"):
+            st.rerun()
 def init_filter(key: str, default):
     if key not in st.session_state:
         st.session_state[key] = default
