@@ -2,129 +2,19 @@ import streamlit as st
 import pandas as pd
 from io import BytesIO
 
-# Set page configuration must be the first streamlit command
+# Set page configuration
 st.set_page_config(page_title="Mason Data Manager", layout="wide")
 
 st.title("Mason Data Management System")
 
-# --- CUSTOM CSS FOR MASON CARDS ---
+# --- TAILWIND CSS & CUSTOM STYLES ---
+# We inject Tailwind via CDN to match the HTML design exactly
 st.markdown("""
+<script src="https://cdn.tailwindcss.com"></script>
 <style>
-    /* Card Container Grid */
-    .mason-grid {
-        display: grid;
-        grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-        gap: 20px;
-        padding: 10px 0;
-    }
-    
-    /* Individual Card Style */
-    .mason-card {
-        background-color: white;
-        padding: 20px;
-        border-radius: 10px;
-        box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-        border-top: 4px solid #4f46e5; /* Indigo top border */
-        font-family: sans-serif;
-        transition: transform 0.2s;
-        border: 1px solid #e2e8f0;
-    }
-    .mason-card:hover {
-        transform: translateY(-2px);
-        box-shadow: 0 10px 15px rgba(0,0,0,0.1);
-    }
-    
-    /* Typography */
-    .mason-name {
-        font-size: 1.25rem;
-        font-weight: bold;
-        color: #1e293b;
-        margin-bottom: 5px;
-    }
-    .mason-meta {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        margin-bottom: 15px;
-    }
-    .mason-code {
-        font-size: 0.875rem;
-        color: #64748b;
-        font-weight: 600;
-    }
-    .mason-cat {
-        background-color: #f1f5f9;
-        color: #475569;
-        padding: 2px 8px;
-        border-radius: 4px;
-        font-size: 0.75rem;
-        font-weight: bold;
-    }
-    
-    /* Details */
-    .mason-detail {
-        font-size: 0.9rem;
-        color: #334155;
-        margin-bottom: 6px;
-        display: flex;
-    }
-    .mason-detail strong {
-        color: #64748b;
-        width: 80px;
-        flex-shrink: 0;
-    }
-    
-    /* Product Tags */
-    .product-section {
-        margin-top: 15px;
-        padding-top: 10px;
-        border-top: 1px solid #f1f5f9;
-    }
-    .product-label {
-        font-size: 0.75rem;
-        font-weight: bold;
-        color: #94a3b8;
-        margin-bottom: 5px;
-        display: block;
-    }
-    .product-tag {
-        display: inline-block;
-        background-color: #e0e7ff; /* Indigo-100 */
-        color: #3730a3; /* Indigo-800 */
-        font-size: 0.75rem;
-        font-weight: 600;
-        padding: 2px 10px;
-        border-radius: 9999px;
-        margin-right: 5px;
-        margin-bottom: 5px;
-    }
-    .no-products {
-        font-style: italic;
-        color: #cbd5e1;
-        font-size: 0.8rem;
-    }
-    
-    /* Call Button */
-    .call-btn {
-        display: block;
+    /* Ensure the grid container works well within Streamlit */
+    .stMarkdown {
         width: 100%;
-        background-color: #16a34a; /* Green-600 */
-        color: white !important;
-        text-align: center;
-        padding: 10px;
-        border-radius: 6px;
-        text-decoration: none;
-        font-weight: 600;
-        margin-top: 15px;
-        transition: background-color 0.2s;
-    }
-    .call-btn:hover {
-        background-color: #15803d; /* Green-700 */
-    }
-    .call-btn-disabled {
-        background-color: #cbd5e1;
-        cursor: not-allowed;
-        pointer-events: none;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -162,7 +52,7 @@ def save_state_for_undo():
 
 # --- Session State Initialization ---
 if 'data' not in st.session_state:
-    # Initialize with SAMPLE DATA so the app isn't blank on start
+    # Initialize with SAMPLE DATA
     sample_data = [
         {"S.NO": 1, "MASON CODE": "M100258", "MASON NAME": "C.PRABHAKARAN", "CONTACT NUMBER": "9487049215", "DLR NAME": "RAJA TRADERS", "Location": "TIRUCHENDUR", "DAY": "MONDAY", "Category": "E", "HW305": "YES", "HW101": "YES", "Hw201": "YES", "HW103": "YES", "HW302": "", "HW310": "", "other": ""},
         {"S.NO": 2, "MASON CODE": "M100259", "MASON NAME": "C.SUDHAKARAN", "CONTACT NUMBER": "9443460152", "DLR NAME": "RAJA TRADERS", "Location": "TIRUCHENDUR", "DAY": "MONDAY", "Category": "E", "HW305": "YES", "HW101": "YES", "Hw201": "YES", "HW103": "YES", "HW302": "", "HW310": "", "other": ""},
@@ -178,7 +68,6 @@ if 'prev_data' not in st.session_state:
 # --- TOP SECTION: Data Operations (Collapsible) ---
 with st.expander("🛠️ Data Management (Import / Add / Undo)", expanded=False):
     
-    # Global Undo Button (Visible if history exists)
     if st.session_state['prev_data'] is not None:
         if st.button("↩️ Undo Last Change", type="primary"):
             st.session_state['data'] = st.session_state['prev_data']
@@ -186,7 +75,6 @@ with st.expander("🛠️ Data Management (Import / Add / Undo)", expanded=False
             st.success("Restored previous version!")
             st.rerun()
     
-    # Tabs for Operations
     op_tab1, op_tab2 = st.tabs(["📂 Import Excel", "➕ Add Single Entry"])
     
     with op_tab1:
@@ -255,10 +143,7 @@ with st.expander("🛠️ Data Management (Import / Add / Undo)", expanded=False
 
 # --- FILTER SECTION (Collapsible) ---
 with st.expander("🔍 Filter Data", expanded=True):
-    # Prepare Data for Filters
     df_display = st.session_state['data'].copy()
-    
-    # 4 Columns for Filters
     fc1, fc2, fc3, fc4 = st.columns(4)
     
     with fc1:
@@ -307,55 +192,73 @@ tab_cards, tab_graphs, tab_data = st.tabs(["📇 Mason Cards", "📈 Analytics",
 
 with tab_cards:
     if not df_display.empty:
-        # We construct a large HTML string representing the grid of cards
-        html_content = '<div class="mason-grid">'
+        # Start the Grid Container using Tailwind classes
+        html_content = '<div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">'
         
         for index, row in df_display.iterrows():
-            # Extract Products
+            # Data Extraction
+            name = row.get("MASON NAME", "Unknown")
+            code = row.get("MASON CODE", "N/A")
+            cat = row.get("Category", "N/A")
+            contact = str(row.get("CONTACT NUMBER", "")).replace(".0", "").strip()
+            loc = row.get("Location", "")
+            dlr = row.get("DLR NAME", "")
+            day = row.get("DAY", "")
+            
+            # Products Badge Logic
             products_html = ""
             hw_cols = ["HW305", "HW101", "Hw201", "HW103", "HW302", "HW310"]
             has_prod = False
             for p in hw_cols:
-                # Robust check: convert to string first to handle booleans/mixed types
                 if p in row and 'YES' in str(row[p]).upper():
-                    products_html += f'<span class="product-tag">{p}</span>'
+                    products_html += f'<span class="inline-block bg-indigo-100 text-indigo-800 text-xs font-medium px-2.5 py-0.5 rounded-full border border-indigo-200 mr-1 mb-1">{p}</span>'
                     has_prod = True
             
             if not has_prod:
-                products_html = '<span class="no-products">No products listed</span>'
+                products_html = '<span class="text-xs text-slate-400 italic">No products listed</span>'
 
-            # Extract Contact for Button
-            raw_contact = str(row.get("CONTACT NUMBER", "")).replace(".0", "").strip()
-            if raw_contact and raw_contact.lower() != "nan" and raw_contact != "":
-                call_btn = f'<a href="tel:{raw_contact}" class="call-btn">📞 Call {raw_contact}</a>'
+            # Call Button Logic
+            if contact and contact.lower() != "nan" and contact != "":
+                call_btn = f"""
+                <a href="tel:{contact}" class="inline-flex items-center justify-center w-full px-4 py-2 bg-green-600 hover:bg-green-700 text-white text-sm font-medium rounded-md transition-colors mt-3">
+                    <span class="mr-2">📞</span> Call Now
+                </a>
+                """
             else:
-                call_btn = '<span class="call-btn call-btn-disabled">No Contact</span>'
+                call_btn = """
+                <button disabled class="inline-flex items-center justify-center w-full px-4 py-2 bg-slate-300 text-slate-500 text-sm font-medium rounded-md mt-3 cursor-not-allowed">
+                    No Contact
+                </button>
+                """
 
-            # Build Card HTML
+            # Exact HTML Structure from Reference
             card = f"""
-            <div class="mason-card">
-                <div class="mason-meta">
-                    <div class="mason-code">{row.get("MASON CODE", "N/A")}</div>
-                    <div class="mason-cat">{row.get("Category", "N/A")}</div>
+            <div class="bg-white rounded-lg shadow p-5 flex flex-col transition-all duration-300 hover:shadow-lg border-t-4 border-indigo-500">
+                <div class="mb-3">
+                    <h3 class="text-xl font-bold text-slate-800">{name}</h3>
+                    <div class="flex justify-between items-center">
+                        <p class="text-sm text-slate-500 font-medium">{code}</p>
+                        <span class="bg-slate-100 text-slate-600 text-xs px-2 py-1 rounded">{cat}</span>
+                    </div>
                 </div>
-                <div class="mason-name">{row.get("MASON NAME", "Unknown")}</div>
-                
-                <div class="mason-detail"><strong>Location:</strong> {row.get("Location", "")}</div>
-                <div class="mason-detail"><strong>DLR:</strong> {row.get("DLR NAME", "")}</div>
-                <div class="mason-detail"><strong>Day:</strong> {row.get("DAY", "")}</div>
-                
-                <div class="product-section">
-                    <span class="product-label">Products:</span>
-                    {products_html}
+                <div class="space-y-2 text-sm text-slate-700 mb-4 flex-grow">
+                    <p class="flex items-start"><span class="w-24 font-semibold text-slate-500">Contact:</span> {contact}</p>
+                    <p class="flex items-start"><span class="w-24 font-semibold text-slate-500">Location:</span> {loc}</p>
+                    <p class="flex items-start"><span class="w-24 font-semibold text-slate-500">DLR:</span> {dlr}</p>
+                    <p class="flex items-start"><span class="w-24 font-semibold text-slate-500">Day:</span> <span class="font-semibold text-indigo-700">{day}</span></p>
                 </div>
-                {call_btn}
+                <div class="mt-auto pt-3 border-t border-slate-200">
+                    <h4 class="text-xs font-semibold text-slate-600 mb-2">Products:</h4>
+                    <div class="flex flex-wrap gap-2 mb-3">
+                        {products_html}
+                    </div>
+                    {call_btn}
+                </div>
             </div>
             """
             html_content += card
             
         html_content += "</div>"
-        
-        # Render the HTML
         st.markdown(html_content, unsafe_allow_html=True)
     else:
         st.info("No masons found matching filters.")
