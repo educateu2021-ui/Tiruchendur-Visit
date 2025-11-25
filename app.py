@@ -296,7 +296,7 @@ with h2:
             st.session_state["data"].to_excel(DATA_FILE, index=False)
             st.success(f"Loaded {len(new_df)} rows.")
             st.experimental_rerun()
-   
+
 # =============================================================
 # DATA MANAGEMENT (TEMPLATE / ADD / UNDO)
 # =============================================================
@@ -385,7 +385,6 @@ with st.expander("🛠️ Data Management (Template / Add / Undo)", expanded=Fal
                     st.session_state["data"].to_excel(DATA_FILE, index=False)
                     st.success("Mason added & saved.")
                     st.experimental_rerun()
-
 
 # =============================================================
 # FILTERS – TRUE CASCADING / DYNAMIC
@@ -711,5 +710,3 @@ with tab_data:
             to_excel(st.session_state["data"]),
             "mason_full_report.xlsx",
         )
-
-
