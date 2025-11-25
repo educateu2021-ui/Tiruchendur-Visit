@@ -477,6 +477,7 @@ with tab_data:
         "HW310": st.column_config.TextColumn("HW310", width="small"),
     }
 
+    # Show the currently filtered data for editing
     edit_df = df_display.copy()
     if not edit_df.empty and "CONTACT NUMBER" in edit_df.columns:
         edit_df["CONTACT NUMBER"] = edit_df["CONTACT NUMBER"].astype(str)
@@ -491,7 +492,7 @@ with tab_data:
 
     st.write("---")
 
-    # Save back changes button
+    # ✅ Save back changes to MAIN DATA (session_state + Excel file)
     if st.button("💾 Save Changes to Main Data"):
         if "S.NO" in edited_df.columns and "S.NO" in st.session_state["data"].columns:
             save_state_for_undo()
@@ -505,10 +506,10 @@ with tab_data:
         else:
             st.error("Column 'S.NO' not found. Cannot map edited rows back to main data.")
 
-    # Export filtered data
-    if not df_display.empty:
+    # 🆕 Download FULL current report (not filtered)
+    if not st.session_state["data"].empty:
         st.download_button(
-            "📥 Export Filtered Data to Excel",
-            to_excel(df_display),
-            "mason_data_export.xlsx",
+            "📥 Download Full Current Report (All Masons)",
+            to_excel(st.session_state["data"]),
+            "mason_full_report.xlsx",
         )
