@@ -568,17 +568,7 @@ with tab_data:
 
     st.write("---")
 
-    if st.button("💾 Save Changes to Main Data"):
-        if "S.NO" in edited_df.columns and "S.NO" in st.session_state["data"].columns:
-            save_state_for_undo()
-            base = st.session_state["data"].set_index("S.NO")
-            updated = edited_df.set_index("S.NO")
-            base.update(updated)
-            st.session_state["data"] = base.reset_index()
-            st.session_state["data"].to_excel(DATA_FILE, index=False)
-            st.success("Changes saved to main dataset and Excel file!")
-        else:
-            st.error("Column 'S.NO' not found. Cannot map edited rows back to main data.")
+   
 
     if not st.session_state["data"].empty:
         st.download_button(
