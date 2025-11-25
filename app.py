@@ -166,8 +166,9 @@ with st.sidebar:
     show_only_products = st.checkbox("Show only with Products")
     show_no_products = st.checkbox("Show only with NO Products")
 
-# --- Main Dashboard ---
+# --- Main Dashboard Logic ---
 
+# 1. Apply Filters
 if not df_display.empty:
     if selected_location != "All":
         df_display = df_display[df_display["Location"] == selected_location]
@@ -184,55 +185,106 @@ if not df_display.empty:
         mask = df_display[hw_cols].apply(lambda x: not x.astype(str).str.contains('YES', case=False).any(), axis=1)
         df_display = df_display[mask]
 
-# Metrics
+# 2. Metrics Row (Always visible)
+st.write("### 📊 Overview")
 m1, m2, m3, m4 = st.columns(4)
 m1.metric("Total Masons", len(st.session_state['data']))
 m2.metric("Visible Rows", len(df_display))
 m3.metric("Unique Locations", df_display["Location"].nunique() if "Location" in df_display.columns else 0)
 m4.metric("Unique DLRs", df_display["DLR NAME"].nunique() if "DLR NAME" in df_display.columns else 0)
 
-st.write("### Mason Database")
-
-column_config = {
-    "CONTACT NUMBER": st.column_config.LinkColumn(
-        "Contact",
-        help="Click to Call",
-        validate=r"^\+?[0-9]*$",
-        display_text=r"(\+?[0-9]*)",
-    ),
-    "HW305": st.column_config.TextColumn("HW305", width="small"),
-    "HW101": st.column_config.TextColumn("HW101", width="small"),
-    "Hw201": st.column_config.TextColumn("Hw201", width="small"),
-    "HW103": st.column_config.TextColumn("HW103", width="small"),
-    "HW302": st.column_config.TextColumn("HW302", width="small"),
-    "HW310": st.column_config.TextColumn("HW310", width="small"),
-}
-
-if not df_display.empty and "CONTACT NUMBER" in df_display.columns:
-    df_display["CONTACT NUMBER"] = df_display["CONTACT NUMBER"].astype(str)
-
-edited_df = st.data_editor(
-    df_display, 
-    num_rows="dynamic", 
-    use_container_width=True,
-    height=500,
-    column_config=column_config
-)
-
 st.write("---")
 
-def to_excel(df):
-    output = BytesIO()
-    with pd.ExcelWriter(output, engine='openpyxl') as writer:
-        df.to_excel(writer, index=False, sheet_name='MasonData')
-    return output.getvalue()
+# 3. Tabs for Graphs vs Data
+tab_graphs, tab_data = st.tabs(["📈 Dashboard & Graphs", "📝 Data Editor"])
 
-if not df_display.empty:
-    st.download_button(
-        label="📥 Export Filtered Data to Excel",
-        data=to_excel(df_display),
-        file_name='mason_data_export.xlsx',
-        mime='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+with tab_graphs:
+    st.subheader("Visual Analytics")
+    if not df_display.empty:
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            st.write("**Masons per Location**")
+            if "Location" in df_display.columns:
+                loc_counts = df_display["Location"].value_counts()
+                st.bar_chart(loc_counts)
+            
+        with col2:
+            st.write("**Masons per Day**")
+            if "DAY" in df_display.columns:
+                day_counts = df_display["DAY"].value_counts()
+                st.bar_chart(day_counts)
+
+        st.write("---")
+        
+        col3, col4 = st.columns(2)
+        
+        with col3:
+            st.write("**Product Popularity**")
+            # Calculate YES counts for each product column
+            hw_cols = ["HW305", "HW101", "Hw201", "HW103", "HW302", "HW310"]
+            available_cols = [c for c in hw_cols if c in df_display.columns]
+            
+            if available_cols:
+                # Count occurrences of "YES" (case insensitive) in each column
+                product_counts = df_display[available_cols].apply(
+                    lambda x: x.astype(str).str.contains('YES', case=False).sum()
+                )
+                st.bar_chart(product_counts)
+        
+        with col4:
+            st.write("**Category Distribution**")
+            if "Category" in df_display.columns:
+                cat_counts = df_display["Category"].value_counts()
+                st.bar_chart(cat_counts)
+    else:
+        st.info("No data available for visualization.")
+
+with tab_data:
+    st.subheader("Data List")
+    
+    column_config = {
+        "CONTACT NUMBER": st.column_config.LinkColumn(
+            "Contact",
+            help="Click to Call",
+            validate=r"^\+?[0-9]*$",
+            display_text=r"(\+?[0-9]*)",
+        ),
+        "HW305": st.column_config.TextColumn("HW305", width="small"),
+        "HW101": st.column_config.TextColumn("HW101", width="small"),
+        "Hw201": st.column_config.TextColumn("Hw201", width="small"),
+        "HW103": st.column_config.TextColumn("HW103", width="small"),
+        "HW302": st.column_config.TextColumn("HW302", width="small"),
+        "HW310": st.column_config.TextColumn("HW310", width="small"),
+    }
+
+    # Ensure contact is string for editor
+    if not df_display.empty and "CONTACT NUMBER" in df_display.columns:
+        df_display["CONTACT NUMBER"] = df_display["CONTACT NUMBER"].astype(str)
+
+    edited_df = st.data_editor(
+        df_display, 
+        num_rows="dynamic", 
+        use_container_width=True,
+        height=500,
+        column_config=column_config
     )
-else:
-    st.info("No data to display. Upload an Excel file or add an entry.")
+
+    st.write("---")
+
+    # Excel Export
+    def to_excel(df):
+        output = BytesIO()
+        with pd.ExcelWriter(output, engine='openpyxl') as writer:
+            df.to_excel(writer, index=False, sheet_name='MasonData')
+        return output.getvalue()
+
+    if not df_display.empty:
+        st.download_button(
+            label="📥 Export Filtered Data to Excel",
+            data=to_excel(df_display),
+            file_name='mason_data_export.xlsx',
+            mime='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+        )
+    else:
+        st.info("No data to display. Upload an Excel file or add an entry.")
