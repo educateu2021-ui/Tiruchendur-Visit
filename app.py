@@ -296,6 +296,13 @@ with h2:
             st.session_state["data"].to_excel(DATA_FILE, index=False)
             st.success(f"Loaded {len(new_df)} rows.")
             st.experimental_rerun()
+    with h2:
+        st.write("**Template**")
+        st.download_button(
+            "📄 Download Blank Template",
+            get_template_excel(),
+            "mason_template.xlsx",
+        )
 
 # =============================================================
 # DATA MANAGEMENT (TEMPLATE / ADD / UNDO)
@@ -310,7 +317,7 @@ with st.expander("🛠️ Data Management (Template / Add / Undo)", expanded=Fal
             st.success("Restored previous version.")
             st.experimental_rerun()
 
-    c1, c2 = st.columns(2)
+    c1 = st.columns(1)
     
     with c1:
         st.write("**Add Single Entry**")
@@ -379,13 +386,7 @@ with st.expander("🛠️ Data Management (Template / Add / Undo)", expanded=Fal
                     st.session_state["data"].to_excel(DATA_FILE, index=False)
                     st.success("Mason added & saved.")
                     st.experimental_rerun()
-    with c2:
-        st.write("**Template**")
-        st.download_button(
-            "📄 Download Blank Template",
-            get_template_excel(),
-            "mason_template.xlsx",
-        )
+    
 
 # =============================================================
 # FILTERS – TRUE CASCADING / DYNAMIC
