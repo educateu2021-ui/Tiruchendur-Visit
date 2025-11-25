@@ -317,9 +317,9 @@ with st.expander("🛠️ Data Management (Template / Add / Undo)", expanded=Fal
             st.success("Restored previous version.")
             st.experimental_rerun()
 
-    c1 = st.columns(1)
     
-    with c1:
+    
+    with h1:
         st.write("**Add Single Entry**")
         with st.form("add_form", clear_on_submit=True):
             a1, a2, a3 = st.columns(3)
