@@ -154,20 +154,12 @@ with st.expander("🛠️ Data Management (Import / Add / Undo)", expanded=False
             st.success("Restored previous version!")
             st.rerun()
 
-    op_tab1, op_tab2 = st.tabs(["📂 Import Excel", "➕ Add Single Entry"])
+    op_tab1, op_tab2 = st.tabs(["➕ Add Single Entry", "📂 Import Excel"])
 
     # --- IMPORT TAB ---
     with op_tab1:
         col1, col2 = st.columns(2)
         with col1:
-            st.info("Step 1: Download Template")
-            st.download_button(
-                label="📄 Download Blank Excel Template",
-                data=get_template_excel(),
-                file_name="mason_data_template.xlsx",
-                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-            )
-        with col2:
             st.info("Step 2: Upload Data")
             uploaded_file = st.file_uploader("Upload Excel File", type=["xlsx", "xls"])
             if uploaded_file is not None:
@@ -270,6 +262,15 @@ with st.expander("🛠️ Data Management (Import / Add / Undo)", expanded=False
 
                     st.success("Entry added & saved!")
                     st.rerun()
+        with col2:
+            st.info("Step 1: Download Template")
+            st.download_button(
+                label="📄 Download Blank Excel Template",
+                data=get_template_excel(),
+                file_name="mason_data_template.xlsx",
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            )
+        
 
 # ------------ FILTER SECTION ------------
 
