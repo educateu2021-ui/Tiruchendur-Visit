@@ -157,7 +157,7 @@ with st.expander("🛠️ Data Management (Import / Add / Undo)", expanded=False
     op_tab1, op_tab2 = st.tabs(["➕ Add Single Entry", "📂 Import Excel"])
 
     # --- IMPORT TAB ---
-    with op_tab1:
+    with op_tab2:
         col1, col2 = st.columns(2)
         with col1:
             st.info("Step 2: Upload Data")
@@ -176,7 +176,7 @@ with st.expander("🛠️ Data Management (Import / Add / Undo)", expanded=False
                         st.rerun()
 
     # --- ADD ENTRY TAB ---
-    with op_tab2:
+    with op_tab1:
         with st.form("entry_form"):
             c1, c2, c3 = st.columns(3)
             with c1:
