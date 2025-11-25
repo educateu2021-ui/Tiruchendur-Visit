@@ -296,14 +296,7 @@ with h2:
             st.session_state["data"].to_excel(DATA_FILE, index=False)
             st.success(f"Loaded {len(new_df)} rows.")
             st.experimental_rerun()
-    with h2:
-        st.write("**Template**")
-        st.download_button(
-            "📄 Download Blank Template",
-            get_template_excel(),
-            "mason_template.xlsx",
-        )
-
+   
 # =============================================================
 # DATA MANAGEMENT (TEMPLATE / ADD / UNDO)
 # =============================================================
