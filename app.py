@@ -293,7 +293,7 @@ with st.expander("🛠️ Data Management (Import / Add / Undo)", expanded=False
     with op_tab2:
         col1, col2 = st.columns(2)
         with col1:
-            st.info("Step 2: Upload Data")
+            st.info("Upload Data")
             uploaded_file = st.file_uploader("Upload Excel File", type=["xlsx", "xls"])
             if uploaded_file is not None:
                 if st.button("Load Data"):
