@@ -403,6 +403,14 @@ with st.expander("🛠️ Data Management (Import / Add / Undo)", expanded=False
                 file_name="mason_data_template.xlsx",
                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
             )
+st.write("---")
+
+    if not st.session_state["data"].empty:
+        st.download_button(
+            "📥 Download Full Current Report (All Masons)",
+            to_excel(st.session_state["data"]),
+            "mason_full_report.xlsx",
+        )
 
 # ------------ FILTERS + METRICS SECTION ------------
 
