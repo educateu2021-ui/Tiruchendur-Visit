@@ -627,7 +627,11 @@ with tab_cards:
             is_visited = row.get("Visited_Status") == "Visited"
             is_registered = row.get("Registered_Status") == "Registered"
 
-            
+            status_badges = ""
+            if is_visited:
+                status_badges += "🧭Visited|  "
+            if is_registered:
+                status_badges += "✅Registered| "
 
             card_label = f"{status_badges} **{name}** "
             if code:
@@ -636,11 +640,7 @@ with tab_cards:
                 card_label += f" | 📍 {loc}"
             if contact:
                 card_label += f" | 📞 {contact}"
-status_badges = ""
-            if is_visited:
-                status_badges += "🧭Visited|  "
-            if is_registered:
-                status_badges += "✅Registered| "
+
             with st.expander(card_label, expanded=False):
 
                 # 1. PRIMARY DETAILS
