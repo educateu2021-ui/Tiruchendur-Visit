@@ -7,90 +7,170 @@ from datetime import datetime
 
 # ------------ CONFIG ------------
 st.set_page_config(page_title="Mason Data Manager", layout="wide")
+
+# Header similar to your HTML Mason Data Explorer
 st.markdown(
     """
-    <h1 style="margin-bottom:0.2rem;">Mason Data Management System</h1>
-    <p style="color:#6b7280;margin-bottom:1.2rem;">
-        Track visits, registrations & product usage across your field operations.
-    </p>
+    <header class="mde-header">
+        <div class="mde-header-inner">
+            <h1 class="mde-title">Mason Data Explorer</h1>
+            <div class="mde-header-right">
+                <span class="mde-header-tag">Field Visit & Registration Tracker</span>
+            </div>
+        </div>
+    </header>
     """,
     unsafe_allow_html=True,
 )
 
-DATA_FILE = "mason_data.xlsx"  # persistent storage file
-
-# ------------ GLOBAL CSS ------------
+# ------------ GLOBAL CSS (match HTML theme) ------------
 st.markdown("""
 <style>
-/* Overall page background + content container */
+/* Page & layout */
 body {
-    background-color: #f3f4f6;
-}
-.main, .block-container {
-    background: #f3f4f6;
+    background-color: #f1f5f9;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
 }
 .block-container {
-    max-width: 1180px;
-    padding-top: 1rem;
-    padding-bottom: 3rem;
+    padding-top: 0.5rem;
+    max-width: 1200px;
 }
 
-/* Expander look */
-.streamlit-expanderHeader {
-    font-weight: 600;
-    color: #111827 !important;
-}
-.streamlit-expanderHeader > div {
-    padding: 0.75rem 0.85rem !important;
-}
-.css-1n76uvr, .css-1v3fvcr {
-    border-radius: 12px !important;
-}
-
-/* General card look if you want to use HTML later */
-.mason-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-    gap: 1.5rem;
-    margin-top: 1rem;
-}
-.mason-card {
+/* Header */
+.mde-header {
+    position: sticky;
+    top: 0;
+    z-index: 50;
+    width: 100%;
     background: #ffffff;
-    border-radius: 12px;
-    padding: 20px;
+    box-shadow: 0 1px 3px rgba(15, 23, 42, 0.06);
+    margin-bottom: 1rem;
+}
+.mde-header-inner {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 0.8rem 1.5rem;
     display: flex;
-    flex-direction: column;
-    border-top: 4px solid #4f46e5;
-    box-shadow: 0 10px 15px rgba(15, 23, 42, 0.08);
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+}
+.mde-title {
+    font-size: 1.7rem;
+    font-weight: 800;
+    color: #4338ca;  /* indigo-700 */
+    margin: 0;
+}
+.mde-header-right {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+.mde-header-tag {
+    font-size: 0.75rem;
+    padding: 0.3rem 0.6rem;
+    border-radius: 999px;
+    background: #eef2ff;
+    color: #4f46e5;
+    font-weight: 600;
 }
 
-/* Style all Streamlit buttons a bit nicer */
+/* Expander like card */
+[data-testid="stExpander"] {
+    border-radius: 0.75rem;
+    border: 1px solid #e5e7eb;
+    box-shadow: 0 10px 15px rgba(15, 23, 42, 0.04);
+    background: #ffffff;
+}
+
+/* Filter section labels */
+.mde-label {
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: #6b7280;
+    margin-bottom: 0.15rem;
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+}
+.mde-label span.icon {
+    font-size: 0.9rem;
+}
+
+/* Give widgets rounded look */
+div[data-baseweb="select"] > div,
+.stSelectbox > div > div {
+    border-radius: 0.5rem;
+}
+
+.stTextInput > div > div input {
+    border-radius: 0.5rem;
+}
+
+/* Buttons */
 div.stButton > button {
-    border-radius: 8px;
+    border-radius: 0.5rem;
     padding: 0.45rem 0.9rem;
     font-weight: 600;
 }
 
-/* Metrics alignment */
+/* Metric cards (KPIs) */
 [data-testid="metric-container"] {
     background: #ffffff;
-    border-radius: 12px;
-    padding: 0.8rem 0.9rem;
+    border-radius: 0.85rem;
+    padding: 0.75rem 0.9rem;
     box-shadow: 0 8px 16px rgba(15, 23, 42, 0.04);
+    border: 1px solid #e5e7eb;
+}
+[data-testid="stMetricLabel"] > div {
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: #6b7280;
+}
+[data-testid="stMetricValue"] {
+    font-size: 1.9rem;
+    font-weight: 800;
+    color: #4f46e5;
+}
+
+/* Chart cards */
+.mde-chart-card {
+    background: #ffffff;
+    border-radius: 0.85rem;
+    padding: 1rem;
+    box-shadow: 0 10px 15px rgba(15, 23, 42, 0.05);
+    border: 1px solid #e5e7eb;
+}
+.mde-chart-title {
+    font-size: 0.95rem;
+    font-weight: 600;
+    text-align: center;
+    margin-bottom: 0.5rem;
+    color: #334155;
+}
+
+/* Mason cards */
+.mason-card {
+    background: #ffffff;
+    border-radius: 0.85rem;
+    padding: 0.9rem 0.95rem 0.8rem 0.95rem;
+    box-shadow: 0 10px 15px rgba(15, 23, 42, 0.06);
+    border-top: 4px solid #4f46e5;
 }
 
 /* Scrollbar */
 ::-webkit-scrollbar { width: 8px; height: 8px; }
-::-webkit-scrollbar-track { background: #f1f1f1; }
-::-webkit-scrollbar-thumb { background: #c7c7c7; border-radius: 4px; }
-::-webkit-scrollbar-thumb:hover { background: #a8a8a8; }
+::-webkit-scrollbar-track { background: #f1f5f9; }
+::-webkit-scrollbar-thumb { background: #cbd5f5; border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover { background: #a5b4fc; }
 </style>
 """, unsafe_allow_html=True)
 
-# ------------ TAILWIND (optional, still loaded) ------------
-st.markdown("""
-<script src="https://cdn.tailwindcss.com"></script>
-""", unsafe_allow_html=True)
+# Optional Tailwind JS (for same feel as HTML)
+st.markdown('<script src="https://cdn.tailwindcss.com"></script>', unsafe_allow_html=True)
 
 # ------------ HELPERS ------------
 
@@ -132,28 +212,25 @@ def to_excel(df: pd.DataFrame) -> bytes:
         df.to_excel(writer, index=False, sheet_name="MasonData")
     return output.getvalue()
 
-# ------------ INITIAL DATA (HARD-CODED + PERSISTENCE) ------------
+# ------------ INITIAL DATA (PERSISTENCE) ------------
+
+DATA_FILE = "mason_data.xlsx"
 
 def get_initial_dataset() -> pd.DataFrame:
     """
     1. If mason_data.xlsx exists -> load & return.
-    2. Else -> build from your big hardcoded dict, save to file, return.
+    2. Else -> return empty structured dataframe (you can import via Excel).
     """
     if Path(DATA_FILE).exists():
         df = pd.read_excel(DATA_FILE)
         return clean_dataframe(df)
 
-    # NOTE: your huge `data = { ... }` dict is kept exactly as before.
-    data = {  # truncated here in explanation – keep your full dict unchanged
-        "S.NO": range(1, 216),
-        # ... all your existing columns ...
-    }
-
-    st.warning("No DATA_FILE and no hardcoded data found. Using empty dataset.")
+    st.warning("No DATA_FILE found. Starting with empty dataset. Use Import Excel or Add Single Entry.")
     df = pd.DataFrame(columns=[
         "S.NO", "MASON CODE", "MASON NAME", "CONTACT NUMBER",
         "DLR NAME", "Location", "DAY", "Category",
-        "HW305", "HW101", "Hw201", "HW103", "HW302", "HW310", "other"
+        "HW305", "HW101", "Hw201", "HW103", "HW302", "HW310", "other",
+        "Visited_Status", "Visited_At", "Registered_Status", "Registered_At"
     ])
     return df
 
@@ -165,12 +242,12 @@ if "data" not in st.session_state:
 if "prev_data" not in st.session_state:
     st.session_state["prev_data"] = None
 
-# ✅ Ensure status columns exist even for older files
+# Ensure status columns exist even for older files
 for col in ["Visited_Status", "Visited_At", "Registered_Status", "Registered_At"]:
     if col not in st.session_state["data"].columns:
         st.session_state["data"][col] = ""
 
-# --- filter-related session defaults ---
+# Filter-related session defaults
 if "filter_day" not in st.session_state:
     st.session_state["filter_day"] = "All"
 if "filter_location" not in st.session_state:
@@ -192,7 +269,7 @@ if "filter_no_products" not in st.session_state:
 if "reset_filters" not in st.session_state:
     st.session_state["reset_filters"] = False
 
-# --- apply reset BEFORE widgets are created ---
+# Apply reset BEFORE widgets render
 if st.session_state.get("reset_filters", False):
     st.session_state["filter_day"] = "All"
     st.session_state["filter_location"] = "All"
@@ -287,12 +364,8 @@ with st.expander("🛠️ Data Management (Import / Add / Undo)", expanded=False
                     st.error("Mason Name is required!")
                 else:
                     save_state_for_undo()
-                    if "S.NO" in st.session_state["data"].columns:
-                        new_sno = (
-                            st.session_state["data"]["S.NO"].max() + 1
-                            if not st.session_state["data"].empty
-                            else 1
-                        )
+                    if "S.NO" in st.session_state["data"].columns and not st.session_state["data"].empty:
+                        new_sno = st.session_state["data"]["S.NO"].max() + 1
                     else:
                         new_sno = 1
 
@@ -345,7 +418,7 @@ with st.expander("🔍 Filter Data", expanded=True):
 
     # Day (drives cascading)
     with fc1:
-        st.markdown("**📅 Day**")
+        st.markdown('<div class="mde-label"><span class="icon">📅</span>Day</div>', unsafe_allow_html=True)
         days_list = [
             str(x).strip()
             for x in base_df.get("DAY", "").unique()
@@ -365,7 +438,7 @@ with st.expander("🔍 Filter Data", expanded=True):
 
     # Location depends on Day
     with fc2:
-        st.markdown("**📍 Location**")
+        st.markdown('<div class="mde-label"><span class="icon">📍</span>Location</div>', unsafe_allow_html=True)
         locs = [
             str(x).strip()
             for x in df_for_location.get("Location", "").unique()
@@ -384,7 +457,7 @@ with st.expander("🔍 Filter Data", expanded=True):
         df_for_category = df_for_category[df_for_category["Location"] == selected_location]
 
     with fc3:
-        st.markdown("**🏷️ Category**")
+        st.markdown('<div class="mde-label"><span class="icon">🏷️</span>Category</div>', unsafe_allow_html=True)
         cats_raw = [
             str(x).strip()
             for x in df_for_category.get("Category", "").unique()
@@ -402,7 +475,7 @@ with st.expander("🔍 Filter Data", expanded=True):
         )
 
     with fc4:
-        st.markdown("**📦 Product Visibility**")
+        st.markdown('<div class="mde-label"><span class="icon">📦</span>Product Visibility</div>', unsafe_allow_html=True)
         show_only_products = st.checkbox(
             "Has Products",
             key="filter_only_products",
@@ -415,14 +488,14 @@ with st.expander("🔍 Filter Data", expanded=True):
     # --- SECOND ROW: Visited / Registered ---
     vc1, vc2 = st.columns(2)
     with vc1:
-        st.markdown("**🧭 Visited Status**")
+        st.markdown('<div class="mde-label"><span class="icon">🧭</span>Visited Status</div>', unsafe_allow_html=True)
         visit_filter = st.selectbox(
             "",
             ["All", "Visited", "Not Visited"],
             key="filter_visit_status",
         )
     with vc2:
-        st.markdown("**📝 Registered Status**")
+        st.markdown('<div class="mde-label"><span class="icon">📝</span>Registered Status</div>', unsafe_allow_html=True)
         reg_filter = st.selectbox(
             "",
             ["All", "Registered", "Not Registered"],
@@ -432,7 +505,7 @@ with st.expander("🔍 Filter Data", expanded=True):
     # --- THIRD ROW: Mobile Search + Buttons ---
     mc1, mc2, mc3 = st.columns([3, 1, 1])
     with mc1:
-        st.markdown("**📱 Search by Mobile Number**")
+        st.markdown('<div class="mde-label"><span class="icon">📱</span>Search by Mobile Number</div>', unsafe_allow_html=True)
         st.session_state["filter_mobile_input"] = st.text_input(
             "",
             value=st.session_state.get("filter_mobile_input", ""),
@@ -571,13 +644,15 @@ with tab_cards:
             ]
 
             with st.container(border=True):
+                st.markdown('<div class="mason-card">', unsafe_allow_html=True)
+
                 header_cols = st.columns([4, 1])
                 with header_cols[0]:
                     st.markdown(f"**{name}**")
                     st.caption(code)
                 with header_cols[1]:
                     st.markdown(
-                        f"<div style='text-align:right;'><span style='font-size:0.75rem;padding:3px 8px;border-radius:6px;background:#e5e7eb;color:#374151;'>{cat}</span></div>",
+                        f"<div style='text-align:right;'><span style='font-size:0.75rem;padding:3px 8px;border-radius:999px;background:#e5e7eb;color:#374151;'>{cat}</span></div>",
                         unsafe_allow_html=True,
                     )
 
@@ -604,7 +679,7 @@ with tab_cards:
 
                 b_call, b_visit, b_reg = st.columns(3)
 
-                # CALL BUTTON (HTML link, color #813405)
+                # CALL BUTTON (HTML link)
                 with b_call:
                     if contact and contact.lower() != "nan":
                         st.markdown(
@@ -615,7 +690,7 @@ with tab_cards:
                                 align-items:center;
                                 width:100%;
                                 padding:0.5rem 0.9rem;
-                                border-radius:8px;
+                                border-radius:0.5rem;
                                 background:#813405;
                                 color:#ffffff;
                                 font-weight:600;
@@ -632,8 +707,8 @@ with tab_cards:
                             <div style="
                                 width:100%;
                                 padding:0.5rem 0.9rem;
-                                border-radius:8px;
-                                background:#cbd5f5;
+                                border-radius:0.5rem;
+                                background:#e5e7eb;
                                 color:#4b5563;
                                 font-weight:600;
                                 text-align:center;
@@ -672,34 +747,48 @@ with tab_cards:
                         st.success(f"Marked {name} as registered.")
                         st.rerun()
 
+                st.markdown('</div>', unsafe_allow_html=True)
+
 # ----- ANALYTICS TAB -----
 with tab_graphs:
-    st.subheader("Visual Analytics")
+    st.subheader("Data Visualizations")
+
     if not df_display.empty:
         col1, col2 = st.columns(2)
         with col1:
-            st.write("**Masons per Location (Filtered)**")
+            st.markdown('<div class="mde-chart-card">', unsafe_allow_html=True)
+            st.markdown('<div class="mde-chart-title">Masons per Location</div>', unsafe_allow_html=True)
             if "Location" in df_display.columns:
                 st.bar_chart(df_display["Location"].value_counts())
+            st.markdown('</div>', unsafe_allow_html=True)
+
         with col2:
-            st.write("**Masons per Day (Filtered)**")
+            st.markdown('<div class="mde-chart-card">', unsafe_allow_html=True)
+            st.markdown('<div class="mde-chart-title">Masons per Day</div>', unsafe_allow_html=True)
             if "DAY" in df_display.columns:
                 st.bar_chart(df_display["DAY"].value_counts())
+            st.markdown('</div>', unsafe_allow_html=True)
 
         col3, col4 = st.columns(2)
         hw_cols = ["HW305", "HW101", "Hw201", "HW103", "HW302", "HW310"]
+
         with col3:
-            st.write("**Product Popularity**")
+            st.markdown('<div class="mde-chart-card">', unsafe_allow_html=True)
+            st.markdown('<div class="mde-chart-title">Product Popularity</div>', unsafe_allow_html=True)
             available = [c for c in hw_cols if c in df_display.columns]
             if available:
                 counts = df_display[available].apply(
                     lambda x: x.astype(str).str.contains("YES", case=False).sum()
                 )
                 st.bar_chart(counts)
+            st.markdown('</div>', unsafe_allow_html=True)
+
         with col4:
-            st.write("**Category Distribution**")
+            st.markdown('<div class="mde-chart-card">', unsafe_allow_html=True)
+            st.markdown('<div class="mde-chart-title">Category Distribution</div>', unsafe_allow_html=True)
             if "Category" in df_display.columns:
                 st.bar_chart(df_display["Category"].value_counts())
+            st.markdown('</div>', unsafe_allow_html=True)
 
 # ----- DATA EDITOR TAB -----
 with tab_data:
@@ -728,17 +817,7 @@ with tab_data:
     )
 
     st.write("---")
-    if st.button("💾 Save Changes to Main Data"):
-        if "S.NO" in edited_df.columns and "S.NO" in st.session_state["data"].columns:
-            save_state_for_undo()
-            base = st.session_state["data"].set_index("S.NO")
-            updated = edited_df.set_index("S.NO")
-            base.update(updated)
-            st.session_state["data"] = base.reset_index()
-            st.session_state["data"].to_excel(DATA_FILE, index=False)
-            st.success("Changes saved to main dataset and Excel file!")
-        else:
-            st.error("Column 'S.NO' not found. Cannot map edited rows back to main data.")
+
     if not st.session_state["data"].empty:
         st.download_button(
             "📥 Download Full Current Report (All Masons)",
