@@ -33,15 +33,12 @@ body {
     -moz-osx-font-smoothing: grayscale;
 }
 .block-container {
-    padding-top: 0.5rem;
+    padding-top: 1.5rem;
     max-width: 1200px;
 }
 
-/* Header */
+/* Header (not sticky now to avoid clipping) */
 .mde-header {
-    position: sticky;
-    top: 0;
-    z-index: 50;
     width: 100%;
     background: #ffffff;
     box-shadow: 0 1px 3px rgba(15, 23, 42, 0.06);
@@ -159,6 +156,7 @@ div.stButton > button {
     padding: 0.9rem 0.95rem 0.8rem 0.95rem;
     box-shadow: 0 10px 15px rgba(15, 23, 42, 0.06);
     border-top: 4px solid #4f46e5;
+    margin-bottom: 0.75rem;
 }
 
 /* Scrollbar */
@@ -316,15 +314,6 @@ with st.expander("🛠️ Data Management (Import / Add / Undo)", expanded=False
                         st.success(f"Loaded {len(new_data)} rows and saved to {DATA_FILE}!")
                         st.rerun()
 
-        with col2:
-            st.info("Step 1: Download Template")
-            st.download_button(
-                label="📄 Download Blank Excel Template",
-                data=get_template_excel(),
-                file_name="mason_data_template.xlsx",
-                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-            )
-
     # --- ADD ENTRY TAB ---
     with op_tab1:
         with st.form("entry_form"):
@@ -408,6 +397,14 @@ with st.expander("🛠️ Data Management (Import / Add / Undo)", expanded=False
 
                     st.success("Entry added & saved!")
                     st.rerun()
+        with col2:
+            st.info("Step 1: Download Template")
+            st.download_button(
+                label="📄 Download Blank Excel Template",
+                data=get_template_excel(),
+                file_name="mason_data_template.xlsx",
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            )
 
 # ------------ FILTER SECTION ------------
 
@@ -644,7 +641,7 @@ with tab_cards:
                 if p in row and isinstance(row[p], str) and "YES" in row[p].upper()
             ]
 
-            with st.container(border=True):
+            with st.container():
                 st.markdown('<div class="mason-card">', unsafe_allow_html=True)
 
                 header_cols = st.columns([4, 1])
@@ -819,54 +816,9 @@ with tab_data:
 
     st.write("---")
 
-    # SAVE BUTTON *INSIDE* THE TAB, using edited_df
-    if st.button("💾 Save Changes to Main Data"):
-        if "data" not in st.session_state or st.session_state["data"].empty:
-            st.error("No main data loaded in session_state['data'].")
-        elif "S.NO" not in edited_df.columns or "S.NO" not in st.session_state["data"].columns:
-            st.error("Column 'S.NO' not found. Cannot map edited rows back to main data.")
-        else:
-            try:
-                save_state_for_undo()
-
-                base = st.session_state["data"].copy()
-                updated = edited_df.copy()
-
-                # Normalize S.NO in both
-                base["S.NO"] = pd.to_numeric(base["S.NO"], errors="coerce").astype("Int64")
-                updated["S.NO"] = pd.to_numeric(updated["S.NO"], errors="coerce").astype("Int64")
-
-                # Use S.NO as index
-                base = base.set_index("S.NO")
-                updated = updated.set_index("S.NO")
-
-                # 1) Update existing rows (common S.NO)
-                common_index = updated.index.intersection(base.index)
-                if len(common_index) > 0:
-                    # align columns
-                    common_cols = [c for c in updated.columns if c in base.columns]
-                    base.loc[common_index, common_cols] = updated.loc[common_index, common_cols]
-
-                # 2) Add new rows that exist only in edited_df
-                new_index = updated.index.difference(base.index)
-                if len(new_index) > 0:
-                    base = pd.concat([base, updated.loc[new_index]], axis=0)
-
-                # Save back
-                st.session_state["data"] = base.reset_index()
-                st.session_state["data"].to_excel(DATA_FILE, index=False)
-
-                st.success("Changes saved to main dataset and Excel file!")
-                st.rerun()
-
-            except Exception as e:
-                st.error(f"Error while saving changes: {e}")
-
-# Download full report button (always reflects latest data)
-st.write("---")
-if "data" in st.session_state and not st.session_state["data"].empty:
-    st.download_button(
-        "📥 Download Full Current Report (All Masons)",
-        to_excel(st.session_state["data"]),
-        "mason_full_report.xlsx",
-    )
+    if not st.session_state["data"].empty:
+        st.download_button(
+            "📥 Download Full Current Report (All Masons)",
+            to_excel(st.session_state["data"]),
+            "mason_full_report.xlsx",
+        )
