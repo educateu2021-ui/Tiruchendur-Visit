@@ -200,6 +200,16 @@ def to_excel(df: pd.DataFrame) -> bytes:
     return output.getvalue()
 
 DATA_FILE = "mason_data.xlsx"
+SNAPSHOT_DIR = Path("mason_snapshots")
+SNAPSHOT_DIR.mkdir(exist_ok=True)
+
+
+def save_month_snapshot(df: pd.DataFrame) -> Path:
+    """Save current data as a month-wise snapshot file and return its path."""
+    month_key = datetime.now().strftime("%Y-%m")  # e.g. 2025-11
+    file_path = SNAPSHOT_DIR / f"mason_data_{month_key}.xlsx"
+    df.to_excel(file_path, index=False)
+    return file_path
 
 def get_initial_dataset() -> pd.DataFrame:
     if Path(DATA_FILE).exists():
