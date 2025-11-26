@@ -270,54 +270,154 @@ with st.expander("🛠️ Data Management (Import / Add / Undo)", expanded=False
                 file_name="mason_data_template.xlsx",
                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
             )
-        
 
 # ------------ FILTER SECTION ------------
 
-with st.expander("🔍 Filter Data", expanded=True):
-    df_display = st.session_state["data"].copy()
+# init default filter state
+if "filter_day" not in st.session_state:
+    st.session_state["filter_day"] = "All"
+if "filter_location" not in st.session_state:
+    st.session_state["filter_location"] = "All"
+if "filter_cat" not in st.session_state:
+    st.session_state["filter_cat"] = "All"
+if "filter_visit_status" not in st.session_state:
+    st.session_state["filter_visit_status"] = "All"
+if "filter_reg_status" not in st.session_state:
+    st.session_state["filter_reg_status"] = "All"
+if "filter_mobile_input" not in st.session_state:
+    st.session_state["filter_mobile_input"] = ""
+if "filter_mobile_query" not in st.session_state:
+    st.session_state["filter_mobile_query"] = ""
 
+with st.expander("🔍 Filter Data", expanded=True):
+    base_df = st.session_state["data"].copy()
+
+    # --- FIRST ROW: Day, Location, Category, Product flags ---
     fc1, fc2, fc3, fc4 = st.columns(4)
 
+    # Day (drives cascading)
     with fc1:
-        locs = [str(x) for x in df_display.get("Location", "").unique() if str(x)]
-        locations = ["All"] + sorted(locs)
-        selected_location = st.selectbox("📍 Location", locations)
+        days_list = [
+            str(x).strip()
+            for x in base_df.get("DAY", "").unique()
+            if str(x).strip()
+        ]
+        days = ["All"] + sorted(set(days_list))
+        selected_day = st.selectbox(
+            "📅 Day",
+            days,
+            key="filter_day",
+        )
 
+    # Filtered df for next-level cascading (Location)
+    df_for_location = base_df.copy()
+    if selected_day != "All":
+        df_for_location = df_for_location[df_for_location["DAY"] == selected_day]
+
+    # Location depends on Day
     with fc2:
-        days_list = [str(x) for x in df_display.get("DAY", "").unique() if str(x)]
-        days = ["All"] + sorted(days_list)
-        selected_day = st.selectbox("📅 Day", days)
+        locs = [
+            str(x).strip()
+            for x in df_for_location.get("Location", "").unique()
+            if str(x).strip()
+        ]
+        locations = ["All"] + sorted(set(locs))
+        selected_location = st.selectbox(
+            "📍 Location",
+            locations,
+            key="filter_location",
+        )
+
+    # Filtered df for Category
+    df_for_category = df_for_location.copy()
+    if selected_location != "All":
+        df_for_category = df_for_category[df_for_category["Location"] == selected_location]
 
     with fc3:
         cats_raw = [
-            str(x)
-            for x in df_display.get("Category", "").unique()
-            if pd.notna(x) and str(x).strip() != ""
+            str(x).strip()
+            for x in df_for_category.get("Category", "").unique()
+            if str(x).strip() != ""
         ]
-        cats = ["All"] + sorted(cats_raw) + ["Blank / Uncategorized"]
-        selected_cat = st.selectbox("🏷️ Category", cats)
+        cats = ["All"] + sorted(set(cats_raw))
+        # Add blank bucket only if there are actually blanks at this level
+        has_blank = (df_for_category.get("Category", "") == "").any()
+        if has_blank:
+            cats.append("Blank / Uncategorized")
+
+        selected_cat = st.selectbox(
+            "🏷️ Category",
+            cats,
+            key="filter_cat",
+        )
 
     with fc4:
         st.write("**Product Visibility**")
-        show_only_products = st.checkbox("Has Products")
-        show_no_products = st.checkbox("No Products")
+        show_only_products = st.checkbox(
+            "Has Products",
+            key="filter_only_products",
+        )
+        show_no_products = st.checkbox(
+            "No Products",
+            key="filter_no_products",
+        )
 
-    # extra row for visited / registered filters
+    # --- SECOND ROW: Visited / Registered ---
     vc1, vc2 = st.columns(2)
     with vc1:
-        visit_filter = st.selectbox("Visited Status", ["All", "Visited", "Not Visited"])
+        visit_filter = st.selectbox(
+            "Visited Status",
+            ["All", "Visited", "Not Visited"],
+            key="filter_visit_status",
+        )
     with vc2:
-        reg_filter = st.selectbox("Registered Status", ["All", "Registered", "Not Registered"])
+        reg_filter = st.selectbox(
+            "Registered Status",
+            ["All", "Registered", "Not Registered"],
+            key="filter_reg_status",
+        )
 
-# Apply filters
+    # --- THIRD ROW: Mobile Search + Buttons ---
+    mc1, mc2, mc3 = st.columns([3, 1, 1])
+    with mc1:
+        st.session_state["filter_mobile_input"] = st.text_input(
+            "📱 Search by Mobile Number",
+            value=st.session_state.get("filter_mobile_input", ""),
+            placeholder="Enter full or partial number...",
+        )
+    with mc2:
+        if st.button("Search", key="btn_mobile_search"):
+            st.session_state["filter_mobile_query"] = st.session_state["filter_mobile_input"].strip()
+            st.rerun()
+    with mc3:
+        if st.button("🔄 Reset Filters", key="btn_reset_filters"):
+            st.session_state["filter_day"] = "All"
+            st.session_state["filter_location"] = "All"
+            st.session_state["filter_cat"] = "All"
+            st.session_state["filter_visit_status"] = "All"
+            st.session_state["filter_reg_status"] = "All"
+            st.session_state["filter_only_products"] = False
+            st.session_state["filter_no_products"] = False
+            st.session_state["filter_mobile_input"] = ""
+            st.session_state["filter_mobile_query"] = ""
+            st.rerun()
+
+# Now apply filters to a fresh copy for display
+df_display = st.session_state["data"].copy()
+
 if not df_display.empty:
-    if selected_location != "All":
-        df_display = df_display[df_display["Location"] == selected_location]
-
+    # Day filter
+    selected_day = st.session_state.get("filter_day", "All")
     if selected_day != "All":
         df_display = df_display[df_display["DAY"] == selected_day]
 
+    # Location filter
+    selected_location = st.session_state.get("filter_location", "All")
+    if selected_location != "All":
+        df_display = df_display[df_display["Location"] == selected_location]
+
+    # Category filter
+    selected_cat = st.session_state.get("filter_cat", "All")
     if selected_cat == "Blank / Uncategorized":
         df_display = df_display[
             df_display["Category"].isna() | (df_display["Category"] == "")
@@ -326,6 +426,7 @@ if not df_display.empty:
         df_display = df_display[df_display["Category"] == selected_cat]
 
     # Visited filter
+    visit_filter = st.session_state.get("filter_visit_status", "All")
     if "Visited_Status" in df_display.columns:
         if visit_filter == "Visited":
             df_display = df_display[df_display["Visited_Status"] == "Visited"]
@@ -336,6 +437,7 @@ if not df_display.empty:
             ]
 
     # Registered filter
+    reg_filter = st.session_state.get("filter_reg_status", "All")
     if "Registered_Status" in df_display.columns:
         if reg_filter == "Registered":
             df_display = df_display[df_display["Registered_Status"] == "Registered"]
@@ -345,7 +447,10 @@ if not df_display.empty:
                 (df_display["Registered_Status"] == "")
             ]
 
+    # Product filters
     hw_cols = ["HW305", "HW101", "Hw201", "HW103", "HW302", "HW310"]
+    show_only_products = st.session_state.get("filter_only_products", False)
+    show_no_products = st.session_state.get("filter_no_products", False)
 
     if show_only_products:
         mask = df_display[hw_cols].apply(
@@ -358,6 +463,14 @@ if not df_display.empty:
             lambda x: not x.astype(str).str.contains("YES", case=False).any(), axis=1
         )
         df_display = df_display[mask]
+
+    # Mobile (contact) search filter
+    mobile_query = st.session_state.get("filter_mobile_query", "")
+    if mobile_query and "CONTACT NUMBER" in df_display.columns:
+        contact_str = df_display["CONTACT NUMBER"].astype(str).str.replace(".0", "", regex=False)
+        df_display = df_display[
+            contact_str.str.contains(mobile_query, case=False, na=False)
+        ]
 
 # ------------ METRICS ------------
 
@@ -568,8 +681,6 @@ with tab_data:
     )
 
     st.write("---")
-
-   
 
     if not st.session_state["data"].empty:
         st.download_button(
