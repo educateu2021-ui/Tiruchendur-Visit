@@ -928,19 +928,72 @@ with tab_data:
         "HW310": st.column_config.TextColumn("HW310", width="small"),
     }
 
+    # Work on the currently filtered data
     edit_df = df_display.copy()
+
+    # Make sure CONTACT NUMBER is string so edits don't break
     if not edit_df.empty and "CONTACT NUMBER" in edit_df.columns:
         edit_df["CONTACT NUMBER"] = edit_df["CONTACT NUMBER"].astype(str)
 
+    # Show editor and capture edits
     edited_df = st.data_editor(
         edit_df,
         num_rows="dynamic",
         use_container_width=True,
         height=500,
         column_config=column_config,
+        key="data_editor",
     )
 
     st.write("---")
+
+    if st.button("💾 Save Data Editor Changes"):
+        if edit_df.empty:
+            st.info("Nothing to save – table is empty.")
+        elif "S.NO" not in edit_df.columns or "S.NO" not in edited_df.columns:
+            st.error("Cannot save changes because 'S.NO' column is missing.")
+        else:
+            # Use S.NO as primary key
+            orig_visible = edit_df.set_index("S.NO")
+            edited_visible = edited_df.set_index("S.NO")
+
+            # Full dataset
+            main = st.session_state["data"].copy()
+            if "S.NO" not in main.columns:
+                st.error("Main data has no 'S.NO' column. Cannot sync edits.")
+            else:
+                main = main.set_index("S.NO")
+
+                # 1️⃣ Deletions: rows that were visible but no longer exist
+                to_delete = set(orig_visible.index) - set(edited_visible.index)
+                if to_delete:
+                    main = main.drop(index=list(to_delete), errors="ignore")
+
+                # 2️⃣ Updates: rows that still exist (overwrite visible columns)
+                common_ids = list(set(orig_visible.index) & set(edited_visible.index))
+                if common_ids:
+                    # Align columns that exist in both
+                    common_cols = [
+                        c for c in edited_visible.columns if c in main.columns
+                    ]
+                    main.loc[common_ids, common_cols] = edited_visible.loc[
+                        common_ids, common_cols
+                    ]
+
+                # 3️⃣ New rows: present in edited table, not in original visible set
+                new_ids = list(set(edited_visible.index) - set(orig_visible.index))
+                if new_ids:
+                    new_rows = edited_visible.loc[new_ids].reset_index()  # includes S.NO
+                    main_reset = main.reset_index()  # bring S.NO back as a column
+                    main_reset = pd.concat([main_reset, new_rows], ignore_index=True)
+                    main = main_reset.set_index("S.NO")
+
+                # Save back to session + disk
+                st.session_state["data"] = main.reset_index()
+                st.session_state["data"].to_excel(DATA_FILE, index=False)
+
+                st.success("Changes from Data Editor saved.")
+                st.rerun()
 
     if not st.session_state["data"].empty:
         st.download_button(
@@ -948,3 +1001,4 @@ with tab_data:
             to_excel(st.session_state["data"]),
             "mason_full_report.xlsx",
         )
+
