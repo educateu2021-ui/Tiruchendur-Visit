@@ -613,139 +613,163 @@ tab_cards, tab_graphs, tab_data = st.tabs(
     ["📇 Mason Cards", "📈 Analytics", "📝 Data Editor"]
 )
 
-# ----- CARDS TAB (WITH ACTION BUTTONS) -----
+# ==========================================
+#        NEW EDITABLE CARDS SECTION
+# ==========================================
 with tab_cards:
-    st.subheader("Mason Directory")
+    st.info("💡 **Tip:** Click a card to expand. Any change you make inside is **saved automatically**.")
+    
+    if df_display.empty:
+        st.warning("No records found matching filters.")
+    
+    # Iterate through the filtered dataframe
+    for index, row in df_display.iterrows():
+        
+        sno = row["S.NO"] # Unique ID
+        
+        # --- Prepare Card Header Visuals ---
+        name = row.get("MASON NAME", "Unknown")
+        code = row.get("MASON CODE", "")
+        loc = row.get("Location", "")
+        contact = str(row.get("CONTACT NUMBER", "")).replace(".0", "")
+        
+        # Status Badges
+        is_visited = row.get("Visited_Status") == "Visited"
+        is_registered = row.get("Registered_Status") == "Registered"
+        
+        status_badges = ""
+        if is_visited: status_badges += "🧭 "
+        if is_registered: status_badges += "✅ "
+        
+        # Card Label (Header)
+        card_label = f"{status_badges} **{name}** "
+        if code: card_label += f"({code}) "
+        if loc: card_label += f" | 📍 {loc}"
+        if contact: card_label += f" | 📞 {contact}"
 
-    df_cards = df_display.copy()
-
-    if df_cards.empty:
-        st.info("No masons found matching filters.")
-    else:
-        for idx, row in df_cards.iterrows():
-            code = row.get("MASON CODE", "N/A")
-            name = row.get("MASON NAME", "Unknown")
-            cat = row.get("Category", "N/A") or "N/A"
-            contact = str(row.get("CONTACT NUMBER", "")).replace(".0", "").strip()
-            loc = row.get("Location", "") or "N/A"
-            dlr = row.get("DLR NAME", "") or "N/A"
-            day = row.get("DAY", "") or "N/A"
-
-            visited_status = row.get("Visited_Status", "")
-            registered_status = row.get("Registered_Status", "")
-
-            hw_cols = ["HW305", "HW101", "Hw201", "HW103", "HW302", "HW310"]
-            prod_list = [
-                p.upper()
-                for p in hw_cols
-                if p in row and isinstance(row[p], str) and "YES" in row[p].upper()
-            ]
-
-            with st.container():
-                st.markdown('<div class="mason-card">', unsafe_allow_html=True)
-
-                header_cols = st.columns([4, 1])
-                with header_cols[0]:
-                    st.markdown(f"**{name}**")
-                    st.caption(code)
-                with header_cols[1]:
-                    st.markdown(
-                        f"<div style='text-align:right;'><span style='font-size:0.75rem;padding:3px 8px;border-radius:999px;background:#e5e7eb;color:#374151;'>{cat}</span></div>",
-                        unsafe_allow_html=True,
-                    )
-
-                st.write(f"**Contact:**  {contact}")
-                st.write(f"**Location:**  {loc}")
-                st.write(f"**DLR:**  {dlr}")
-                st.write(f"**Day:**  :blue[{day}]")
-
-                st.write(
-                    "**Products:** "
-                    + (", ".join(prod_list) if prod_list else "_No products listed_")
+        # --- The Card (Expander) ---
+        with st.expander(card_label, expanded=False):
+            
+            # 1. PRIMARY DETAILS
+            st.markdown("#### 👤 Personal Details")
+            c1, c2, c3 = st.columns(3)
+            
+            with c1:
+                st.text_input(
+                    "Mason Name", 
+                    value=name, 
+                    key=f"name_{sno}", 
+                    on_change=update_entry, 
+                    args=(sno, "MASON NAME", f"name_{sno}")
+                )
+            with c2:
+                st.text_input(
+                    "Mason Code", 
+                    value=code, 
+                    key=f"code_{sno}", 
+                    on_change=update_entry, 
+                    args=(sno, "MASON CODE", f"code_{sno}")
+                )
+            with c3:
+                st.text_input(
+                    "Contact Number", 
+                    value=contact, 
+                    key=f"cont_{sno}", 
+                    on_change=update_entry, 
+                    args=(sno, "CONTACT NUMBER", f"cont_{sno}")
                 )
 
-                # Show current status on card
-                status_line = []
-                if visited_status:
-                    status_line.append("🧭 Visited")
-                if registered_status:
-                    status_line.append("📝 Registered")
-                if status_line:
-                    st.caption("Status: " + ", ".join(status_line))
+            # 2. LOCATION & META
+            st.markdown("#### 📍 Location & Classification")
+            l1, l2, l3, l4 = st.columns(4)
+            with l1:
+                st.text_input(
+                    "Location", value=loc, key=f"loc_{sno}",
+                    on_change=update_entry, args=(sno, "Location", f"loc_{sno}")
+                )
+            with l2:
+                st.text_input(
+                    "DLR Name", value=row.get("DLR NAME", ""), key=f"dlr_{sno}",
+                    on_change=update_entry, args=(sno, "DLR NAME", f"dlr_{sno}")
+                )
+            with l3:
+                 st.text_input(
+                    "Day", value=row.get("DAY", ""), key=f"day_{sno}",
+                    on_change=update_entry, args=(sno, "DAY", f"day_{sno}")
+                )
+            with l4:
+                st.selectbox(
+                    "Category", ["E", "M", "Other", ""],
+                    index=["E", "M", "Other", ""].index(row.get("Category", "")) if row.get("Category") in ["E", "M", "Other"] else 3,
+                    key=f"cat_{sno}",
+                    on_change=update_entry, args=(sno, "Category", f"cat_{sno}")
+                )
 
-                st.markdown("---")
+            # 3. PRODUCTS
+            st.markdown("#### 📦 Products Interested")
+            p_cols = st.columns(6)
+            hw_list = ["HW305", "HW101", "Hw201", "HW103", "HW302", "HW310"]
+            
+            for i, prod in enumerate(hw_list):
+                val_str = str(row.get(prod, "")).upper()
+                is_checked = "YES" in val_str
+                with p_cols[i]:
+                    st.checkbox(
+                        prod, 
+                        value=is_checked, 
+                        key=f"{prod}_{sno}",
+                        on_change=update_entry,
+                        args=(sno, prod, f"{prod}_{sno}", True) # True indicates checkbox logic
+                    )
 
-                b_call, b_visit, b_reg = st.columns(3)
+            # 4. REMARKS / OTHER
+            st.markdown("#### 📝 Remarks")
+            st.text_area(
+                "Other Notes", 
+                value=row.get("other", ""), 
+                height=68,
+                key=f"other_{sno}",
+                on_change=update_entry,
+                args=(sno, "other", f"other_{sno}")
+            )
+            
+            st.markdown("---")
+            
+            # 5. ACTION BUTTONS (CALL / VISIT / REGISTER)
+            b1, b2, b3 = st.columns([1, 1, 1])
+            
+            # Call Button (HTML Link)
+            with b1:
+                if contact and len(contact) > 5:
+                    st.markdown(
+                        f"""<a href="tel:{contact}" style="display:block;text-align:center;background:#166534;color:white;padding:8px;border-radius:5px;text-decoration:none;">📞 Call Now</a>""", 
+                        unsafe_allow_html=True
+                    )
+                else:
+                    st.caption("🚫 No valid number")
 
-                # CALL BUTTON (HTML link)
-                with b_call:
-                    if contact and contact.lower() != "nan":
-                        st.markdown(
-                            f"""
-                            <a href="tel:{contact}" style="
-                                display:inline-flex;
-                                justify-content:center;
-                                align-items:center;
-                                width:100%;
-                                padding:0.5rem 0.9rem;
-                                border-radius:0.5rem;
-                                background:#813405;
-                                color:#ffffff;
-                                font-weight:600;
-                                text-decoration:none;
-                            ">
-                                📲 Call
-                            </a>
-                            """,
-                            unsafe_allow_html=True,
-                        )
-                    else:
-                        st.markdown(
-                            """
-                            <div style="
-                                width:100%;
-                                padding:0.5rem 0.9rem;
-                                border-radius:0.5rem;
-                                background:#e5e7eb;
-                                color:#4b5563;
-                                font-weight:600;
-                                text-align:center;
-                            ">
-                                No Contact
-                            </div>
-                            """,
-                            unsafe_allow_html=True,
-                        )
+            # Visited Toggle
+            with b2:
+                v_label = "✅ Visited" if is_visited else "Mark Visited"
+                v_type = "primary" if is_visited else "secondary"
+                if st.button(v_label, key=f"btn_vis_{sno}", type=v_type, use_container_width=True):
+                    new_status = "" if is_visited else "Visited"
+                    st.session_state["data"].loc[st.session_state["data"]["S.NO"]==sno, "Visited_Status"] = new_status
+                    st.session_state["data"].loc[st.session_state["data"]["S.NO"]==sno, "Visited_At"] = datetime.now().strftime("%Y-%m-%d") if new_status else ""
+                    st.session_state["data"].to_excel(DATA_FILE, index=False)
+                    st.rerun()
 
-                # VISITED BUTTON (Streamlit)
-                with b_visit:
-                    label = "🧭 Visited" if not visited_status else "✅ Visited"
-                    if st.button(label, key=f"visit_{code}_{idx}"):
-                        save_state_for_undo()
-                        mask = st.session_state["data"]["MASON CODE"] == code
-                        st.session_state["data"].loc[mask, "Visited_Status"] = "Visited"
-                        st.session_state["data"].loc[mask, "Visited_At"] = datetime.now().strftime(
-                            "%Y-%m-%d %H:%M:%S"
-                        )
-                        st.session_state["data"].to_excel(DATA_FILE, index=False)
-                        st.success(f"Marked {name} as visited.")
-                        st.rerun()
+            # Registered Toggle
+            with b3:
+                r_label = "✅ Registered" if is_registered else "Mark Registered"
+                r_type = "primary" if is_registered else "secondary"
+                if st.button(r_label, key=f"btn_reg_{sno}", type=r_type, use_container_width=True):
+                    new_status = "" if is_registered else "Registered"
+                    st.session_state["data"].loc[st.session_state["data"]["S.NO"]==sno, "Registered_Status"] = new_status
+                    st.session_state["data"].loc[st.session_state["data"]["S.NO"]==sno, "Registered_At"] = datetime.now().strftime("%Y-%m-%d") if new_status else ""
+                    st.session_state["data"].to_excel(DATA_FILE, index=False)
+                    st.rerun()
 
-                # REGISTERED BUTTON (Streamlit)
-                with b_reg:
-                    label = "📝 Registered" if not registered_status else "✅ Registered"
-                    if st.button(label, key=f"reg_{code}_{idx}"):
-                        save_state_for_undo()
-                        mask = st.session_state["data"]["MASON CODE"] == code
-                        st.session_state["data"].loc[mask, "Registered_Status"] = "Registered"
-                        st.session_state["data"].loc[mask, "Registered_At"] = datetime.now().strftime(
-                            "%Y-%m-%d %H:%M:%S"
-                        )
-                        st.session_state["data"].to_excel(DATA_FILE, index=False)
-                        st.success(f"Marked {name} as registered.")
-                        st.rerun()
-
-                st.markdown('</div>', unsafe_allow_html=True)
 
 # ----- ANALYTICS TAB -----
 with tab_graphs:
