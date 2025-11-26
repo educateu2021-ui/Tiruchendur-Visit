@@ -604,9 +604,8 @@ st.divider()
 tab_cards, tab_graphs, tab_data = st.tabs(
     ["📇 Mason Cards", "📈 Analytics", "📝 Data Editor"]
 )
-
 # ==========================================
-#        NEW EDITABLE CARDS SECTION
+#        NEW EDITABLE CARDS SECTION (PAGINATED)
 # ==========================================
 with tab_cards:
     st.subheader("Mason Directory")
@@ -615,7 +614,46 @@ with tab_cards:
     if df_display.empty:
         st.warning("No records found matching filters.")
     else:
-        for index, row in df_display.iterrows():
+        # ---------- PAGINATION CONTROLS ----------
+        total_cards = len(df_display)
+
+        # Cards per page (10 / 20 / 50)
+        c1, c2, c3 = st.columns([1, 1, 3])
+        with c1:
+            page_size = st.selectbox(
+                "Cards per page",
+                [10, 20, 50],
+                index=1,
+                key="cards_page_size",
+            )
+        total_pages = max(1, math.ceil(total_cards / page_size))
+
+        with c2:
+            current_page = st.number_input(
+                "Page",
+                min_value=1,
+                max_value=total_pages,
+                value=min(st.session_state.get("cards_page", 1), total_pages),
+                step=1,
+                key="cards_page",
+            )
+
+        start_idx = (current_page - 1) * page_size
+        end_idx = start_idx + page_size
+        df_page = df_display.iloc[start_idx:end_idx]
+
+        with c3:
+            st.markdown(
+                f"<div style='margin-top:1.7rem;font-size:0.85rem;color:#6b7280;'>"
+                f"Showing <b>{start_idx + 1}</b> – <b>{min(end_idx, total_cards)}</b> of <b>{total_cards}</b> records"
+                f"</div>",
+                unsafe_allow_html=True,
+            )
+
+        st.markdown("---")
+
+        # ---------- RENDER ONLY CURRENT PAGE CARDS ----------
+        for index, row in df_page.iterrows():
             sno = int(row["S.NO"]) if "S.NO" in row else index
 
             # Header visuals
