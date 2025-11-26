@@ -404,8 +404,8 @@ with st.expander("🛠️ Data Management (Import / Add / Undo)", expanded=False
                     st.success("Entry added & saved!")
                     st.rerun()
                       with col2:
-            st.info("Step 1: Download Template")
-            st.markdown("Download this template to **add your data** in the correct format.")
+             with col2:
+            st.info("Step 2: Download Template")
             st.download_button(
                 label="📄 Download Blank Excel Template",
                 data=get_template_excel(),
