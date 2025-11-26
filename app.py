@@ -629,9 +629,9 @@ with tab_cards:
 
             status_badges = ""
             if is_visited:
-                status_badges += "🧭Visited|  "
+                status_badges += "🧭Visited |"
             if is_registered:
-                status_badges += "✅Registered| "
+                status_badges += "✅Registered |"
 
             card_label = f"{status_badges} **{name}** "
             if code:
