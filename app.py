@@ -232,7 +232,7 @@ for col in ["Visited_Status", "Visited_At", "Registered_Status", "Registered_At"
 defaults = {
     "filter_day": "All",
     "filter_location": "All",
-    "filter_dlr": "All",          # NEW: DLR filter
+    "filter_dlr": "All",          # DLR filter
     "filter_cat": "All",
     "filter_visit_status": "All",
     "filter_reg_status": "All",
@@ -293,7 +293,7 @@ with st.expander("🛠️ Data Management (Import / Add / Undo)", expanded=False
     with op_tab2:
         col1, col2 = st.columns(2)
         with col1:
-            st.info(" Step 1: Upload Data")
+            st.info("Step 2: Upload Data")
             uploaded_file = st.file_uploader("Upload Excel File", type=["xlsx", "xls"])
             if uploaded_file is not None:
                 if st.button("Load Data"):
@@ -310,7 +310,8 @@ with st.expander("🛠️ Data Management (Import / Add / Undo)", expanded=False
 
     # --- ADD ENTRY TAB ---
     with op_tab1:
-        with st.form("entry_form"):
+        # ✅ use clear_on_submit to reset form instead of manual session_state writes
+        with st.form("entry_form", clear_on_submit=True):
             c1, c2, c3 = st.columns(3)
             with c1:
                 mason_code = st.text_input("Mason Code", key="form_mason_code")
@@ -390,33 +391,21 @@ with st.expander("🛠️ Data Management (Import / Add / Undo)", expanded=False
                     )
                     st.session_state["data"].to_excel(DATA_FILE, index=False)
 
-                    # CLEAR FORM FIELDS
-                    for key in [
-                        "form_mason_code", "form_mason_name", "form_contact_number",
-                        "form_dlr_name", "form_location", "form_other"
-                    ]:
-                        st.session_state[key] = ""
-                    for key in ["form_hw305", "form_hw101", "form_hw201", "form_hw103", "form_hw302", "form_hw310"]:
-                        st.session_state[key] = False
-                    st.session_state["form_day"] = "MONDAY"
-                    st.session_state["form_category"] = "E"
-
                     st.success("Entry added & saved!")
                     st.rerun()
-                      with col2:
-             with col2:
-            st.info("Step 2: Download Template")
+
+        # col2 defined in Import tab block above
+        with col2:
+            st.info("Step 1: Download Template")
             st.download_button(
                 label="📄 Download Blank Excel Template",
                 data=get_template_excel(),
                 file_name="mason_data_template.xlsx",
                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
             )
-       
 
 # ------------ FILTERS + METRICS SECTION ------------
 
-# NOTE: df_display will be created AFTER building filters (as before)
 with st.expander("Filters", expanded=True):
     base_df = st.session_state["data"].copy()
 
@@ -675,14 +664,14 @@ with k4:
 
 st.divider()
 
-
 # ------------ MAIN TABS ------------
 
 tab_cards, tab_graphs, tab_data = st.tabs(
     ["📇 Mason Cards", "📈 Analytics", "📝 Data Editor"]
 )
+
 # ==========================================
-#        NEW EDITABLE CARDS SECTION (PAGINATED)
+#   EDITABLE CARDS SECTION (PAGINATED)
 # ==========================================
 with tab_cards:
     st.subheader("Mason Directory")
@@ -694,7 +683,6 @@ with tab_cards:
         # ---------- PAGINATION CONTROLS ----------
         total_cards = len(df_display)
 
-        # Cards per page (10 / 20 / 50)
         c1, c2, c3 = st.columns([1, 1, 3])
         with c1:
             page_size = st.selectbox(
