@@ -403,19 +403,22 @@ with st.expander("🛠️ Data Management (Import / Add / Undo)", expanded=False
 
                     st.success("Entry added & saved!")
                     st.rerun()
+ with col2:
 
-       with col2:
-        st.info("Step 1: Download Template")
-        
-        # --- Added Description Here ---
-        st.markdown("Download this template to **add your data** in the correct format.")
-        
-        st.download_button(
-            label="📄 Download Blank Excel Template",
-            data=get_template_excel(),
-            file_name="mason_data_template.xlsx",
-            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        )
+            st.info("Step 2: Download Template")
+            st.markdown("Download this template to **add your data** in the correct format.")
+            st.download_button(
+
+                label="📄 Download Blank Excel Template",
+
+                data=get_template_excel(),
+
+                file_name="mason_data_template.xlsx",
+
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+
+            )
+       
 
 # ------------ FILTERS + METRICS SECTION ------------
 
