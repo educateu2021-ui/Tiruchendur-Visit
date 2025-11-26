@@ -316,6 +316,15 @@ with st.expander("🛠️ Data Management (Import / Add / Undo)", expanded=False
                         st.success(f"Loaded {len(new_data)} rows and saved to {DATA_FILE}!")
                         st.rerun()
 
+        with col2:
+            st.info("Step 1: Download Template")
+            st.download_button(
+                label="📄 Download Blank Excel Template",
+                data=get_template_excel(),
+                file_name="mason_data_template.xlsx",
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            )
+
     # --- ADD ENTRY TAB ---
     with op_tab1:
         with st.form("entry_form"):
@@ -399,14 +408,6 @@ with st.expander("🛠️ Data Management (Import / Add / Undo)", expanded=False
 
                     st.success("Entry added & saved!")
                     st.rerun()
-        with col2:
-            st.info("Step 1: Download Template")
-            st.download_button(
-                label="📄 Download Blank Excel Template",
-                data=get_template_excel(),
-                file_name="mason_data_template.xlsx",
-                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-            )
 
 # ------------ FILTER SECTION ------------
 
@@ -816,45 +817,53 @@ with tab_data:
         column_config=column_config,
     )
 
-    import pandas as pd
+    st.write("---")
 
+    # SAVE BUTTON *INSIDE* THE TAB, using edited_df
+    if st.button("💾 Save Changes to Main Data"):
+        if "data" not in st.session_state or st.session_state["data"].empty:
+            st.error("No main data loaded in session_state['data'].")
+        elif "S.NO" not in edited_df.columns or "S.NO" not in st.session_state["data"].columns:
+            st.error("Column 'S.NO' not found. Cannot map edited rows back to main data.")
+        else:
+            try:
+                save_state_for_undo()
+
+                base = st.session_state["data"].copy()
+                updated = edited_df.copy()
+
+                # Normalize S.NO in both
+                base["S.NO"] = pd.to_numeric(base["S.NO"], errors="coerce").astype("Int64")
+                updated["S.NO"] = pd.to_numeric(updated["S.NO"], errors="coerce").astype("Int64")
+
+                # Use S.NO as index
+                base = base.set_index("S.NO")
+                updated = updated.set_index("S.NO")
+
+                # 1) Update existing rows (common S.NO)
+                common_index = updated.index.intersection(base.index)
+                if len(common_index) > 0:
+                    # align columns
+                    common_cols = [c for c in updated.columns if c in base.columns]
+                    base.loc[common_index, common_cols] = updated.loc[common_index, common_cols]
+
+                # 2) Add new rows that exist only in edited_df
+                new_index = updated.index.difference(base.index)
+                if len(new_index) > 0:
+                    base = pd.concat([base, updated.loc[new_index]], axis=0)
+
+                # Save back
+                st.session_state["data"] = base.reset_index()
+                st.session_state["data"].to_excel(DATA_FILE, index=False)
+
+                st.success("Changes saved to main dataset and Excel file!")
+                st.rerun()
+
+            except Exception as e:
+                st.error(f"Error while saving changes: {e}")
+
+# Download full report button (always reflects latest data)
 st.write("---")
-
-if st.button("💾 Save Changes to Main Data"):
-    # Safety check: data exists
-    if "data" not in st.session_state or st.session_state["data"].empty:
-        st.error("No main data loaded in session_state['data'].")
-    elif "S.NO" not in edited_df.columns or "S.NO" not in st.session_state["data"].columns:
-        st.error("Column 'S.NO' not found. Cannot map edited rows back to main data.")
-    else:
-        try:
-            save_state_for_undo()  # your existing undo logic
-
-            # Work on copies
-            base = st.session_state["data"].copy()
-            updated = edited_df.copy()
-
-            # 🔑 Make sure S.NO has the SAME TYPE in both
-            # (use Int64 so NaNs are allowed; change if you prefer plain int)
-            base["S.NO"] = pd.to_numeric(base["S.NO"], errors="coerce").astype("Int64")
-            updated["S.NO"] = pd.to_numeric(updated["S.NO"], errors="coerce").astype("Int64")
-
-            # Set index and update
-            base = base.set_index("S.NO")
-            updated = updated.set_index("S.NO")
-
-            # This will overwrite values in base with those from updated where index + column match
-            base.update(updated)
-
-            # Store back to session_state and Excel
-            st.session_state["data"] = base.reset_index()
-            st.session_state["data"].to_excel(DATA_FILE, index=False)
-
-            st.success("Changes saved to main dataset and Excel file!")
-        except Exception as e:
-            st.error(f"Error while saving changes: {e}")
-
-# Download button (unchanged)
 if "data" in st.session_state and not st.session_state["data"].empty:
     st.download_button(
         "📥 Download Full Current Report (All Masons)",
