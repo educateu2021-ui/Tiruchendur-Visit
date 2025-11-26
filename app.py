@@ -297,7 +297,9 @@ with st.expander("🛠️ Data Management (Import / Add / Undo)", expanded=False
             st.success("Restored previous version!")
             st.rerun()
 
-    op_tab1, op_tab2 = st.tabs(["➕ Add Single Entry", "📂 Import Excel"])
+    op_tab1, op_tab2, op_tab3 = st.tabs(
+    ["➕ Add Single Entry", "📂 Import Excel", "📤 Export / Snapshots"])
+
 
     # --- IMPORT TAB ---
     with op_tab2:
