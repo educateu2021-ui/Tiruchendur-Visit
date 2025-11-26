@@ -305,7 +305,7 @@ with st.expander("🛠️ Data Management (Import / Add / Undo)", expanded=False
     with op_tab2:
         col1, col2 = st.columns(2)
         with col1:
-            st.info("Step 2: Upload Data")
+            st.info("Step 1: Upload Data")
             uploaded_file = st.file_uploader("Upload Excel File", type=["xlsx", "xls"])
             if uploaded_file is not None:
                 if st.button("Load Data"):
@@ -319,6 +319,49 @@ with st.expander("🛠️ Data Management (Import / Add / Undo)", expanded=False
                         st.session_state["data"].to_excel(DATA_FILE, index=False)
                         st.success(f"Loaded {len(new_data)} rows and saved to {DATA_FILE}!")
                         st.rerun()
+                            # --- EXPORT / SNAPSHOTS TAB ---
+    with op_tab3:
+        st.subheader("Export & Monthly Snapshots")
+
+        # 1) Download current full dataset (live data)
+        st.markdown("**Download current full dataset**")
+        st.download_button(
+            "📥 Download Current Data",
+            to_excel(st.session_state["data"]),
+            file_name=f"mason_data_{datetime.now().strftime('%Y-%m-%d_%H%M')}.xlsx",
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        )
+
+        st.markdown("---")
+
+        # 2) Save / overwrite this month's snapshot to disk
+        st.markdown("**Save / update this month's snapshot**")
+        st.caption("This will save the current data as `mason_data_YYYY-MM.xlsx` inside the `mason_snapshots` folder.")
+
+        if st.button("💾 Save This Month Snapshot"):
+            snapshot_path = save_month_snapshot(st.session_state["data"])
+            st.success(f"Snapshot saved as: {snapshot_path.name}")
+
+        st.markdown("---")
+
+        # 3) List existing monthly snapshot files with download buttons
+        st.markdown("**Monthly snapshots**")
+
+        snapshot_files = sorted(SNAPSHOT_DIR.glob("mason_data_*.xlsx"), reverse=True)
+        if not snapshot_files:
+            st.caption("No snapshots saved yet.")
+        else:
+            for f in snapshot_files:
+                month_label = f.stem.replace("mason_data_", "")  # e.g. 2025-11
+                with open(f, "rb") as fh:
+                    st.download_button(
+                        label=f"📅 Download {month_label} snapshot",
+                        data=fh.read(),
+                        file_name=f.name,
+                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                        key=f"dl_{month_label}",
+                    )
+
 
     # --- ADD ENTRY TAB ---
     with op_tab1:
@@ -408,7 +451,7 @@ with st.expander("🛠️ Data Management (Import / Add / Undo)", expanded=False
 
         # col2 defined in Import tab block above
         with col2:
-            st.info("Step 1: Download Template")
+            st.info("Step 2: Download Template")
             st.download_button(
                 label="📄 Download Blank Excel Template",
                 data=get_template_excel(),
