@@ -629,7 +629,7 @@ with tab_cards:
 
             status_badges = ""
             if is_visited:
-                status_badges += "🧭 "
+                status_badges += "🧭|  "
             if is_registered:
                 status_badges += "✅ "
 
