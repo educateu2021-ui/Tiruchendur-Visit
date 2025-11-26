@@ -232,6 +232,7 @@ for col in ["Visited_Status", "Visited_At", "Registered_Status", "Registered_At"
 defaults = {
     "filter_day": "All",
     "filter_location": "All",
+    "filter_dlr": "All",          # NEW: DLR filter
     "filter_cat": "All",
     "filter_visit_status": "All",
     "filter_reg_status": "All",
@@ -241,6 +242,7 @@ defaults = {
     "filter_no_products": False,
     "reset_filters": False,
 }
+
 for k, v in defaults.items():
     if k not in st.session_state:
         st.session_state[k] = v
@@ -411,51 +413,95 @@ with st.expander("🛠️ Data Management (Import / Add / Undo)", expanded=False
                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
             )
 
-# ------------ FILTER SECTION ------------
+# ------------ FILTERS + METRICS SECTION ------------
 
-with st.expander("🔍 Filter Data", expanded=True):
+# NOTE: df_display will be created AFTER building filters (as before)
+with st.expander("Filters", expanded=True):
     base_df = st.session_state["data"].copy()
 
-    # --- FIRST ROW: Day, Location, Category, Product flags ---
+    # --- HEADER ROW: title + reset link ---
+    h1, h2 = st.columns([3, 1])
+    with h1:
+        st.markdown("### Filters")
+    with h2:
+        st.markdown(
+            "<div style='text-align:right;margin-top:0.6rem;'>",
+            unsafe_allow_html=True,
+        )
+        if st.button("🔄 Reset Filters", key="btn_reset_filters_top"):
+            st.session_state["reset_filters"] = True
+            st.rerun()
+        st.markdown("</div>", unsafe_allow_html=True)
+
+    st.markdown("---")
+
+    # --- FIRST ROW: Location, DLR, Day, Category (cascade) ---
     fc1, fc2, fc3, fc4 = st.columns(4)
 
-    with fc1:
+    # DAY options (for cascading)
+    days_list = [
+        str(x).strip()
+        for x in base_df.get("DAY", "").unique()
+        if str(x).strip()
+    ]
+    all_days = ["All"] + sorted(set(days_list))
+
+    with fc3:
         st.markdown('<div class="mde-label"><span class="icon">📅</span>Day</div>', unsafe_allow_html=True)
-        days_list = [
-            str(x).strip()
-            for x in base_df.get("DAY", "").unique()
-            if str(x).strip()
-        ]
-        days = ["All"] + sorted(set(days_list))
         selected_day = st.selectbox(
             "",
-            days,
+            all_days,
             key="filter_day",
         )
 
-    df_for_location = base_df.copy()
+    # dataframe limited by day (for next cascades)
+    df_after_day = base_df.copy()
     if selected_day != "All":
-        df_for_location = df_for_location[df_for_location["DAY"] == selected_day]
+        df_after_day = df_after_day[df_after_day["DAY"] == selected_day]
 
-    with fc2:
+    # LOCATION options depend on day
+    locs = [
+        str(x).strip()
+        for x in df_after_day.get("Location", "").unique()
+        if str(x).strip()
+    ]
+    all_locs = ["All"] + sorted(set(locs))
+
+    with fc1:
         st.markdown('<div class="mde-label"><span class="icon">📍</span>Location</div>', unsafe_allow_html=True)
-        locs = [
-            str(x).strip()
-            for x in df_for_location.get("Location", "").unique()
-            if str(x).strip()
-        ]
-        locations = ["All"] + sorted(set(locs))
         selected_location = st.selectbox(
             "",
-            locations,
+            all_locs,
             key="filter_location",
         )
 
-    df_for_category = df_for_location.copy()
+    # dataframe limited by day + location
+    df_after_loc = df_after_day.copy()
     if selected_location != "All":
-        df_for_category = df_for_category[df_for_category["Location"] == selected_location]
+        df_after_loc = df_after_loc[df_after_loc["Location"] == selected_location]
 
-    with fc3:
+    # DLR options depend on day + location
+    dlrs_raw = [
+        str(x).strip()
+        for x in df_after_loc.get("DLR NAME", "").unique()
+        if str(x).strip()
+    ]
+    all_dlrs = ["All"] + sorted(set(dlrs_raw))
+
+    with fc2:
+        st.markdown('<div class="mde-label"><span class="icon">🏪</span>DLR Name</div>', unsafe_allow_html=True)
+        selected_dlr = st.selectbox(
+            "",
+            all_dlrs,
+            key="filter_dlr",
+        )
+
+    # dataframe limited by day + location + dlr (for Category options)
+    df_for_category = df_after_loc.copy()
+    if selected_dlr != "All":
+        df_for_category = df_for_category[df_for_category["DLR NAME"] == selected_dlr]
+
+    with fc4:
         st.markdown('<div class="mde-label"><span class="icon">🏷️</span>Category</div>', unsafe_allow_html=True)
         cats_raw = [
             str(x).strip()
@@ -473,17 +519,22 @@ with st.expander("🔍 Filter Data", expanded=True):
             key="filter_cat",
         )
 
-    with fc4:
+    # --- SECOND ROW: Product visibility ---
+    pvc1, pvc2, pvc3 = st.columns([1, 1, 2])
+    with pvc1:
         st.markdown('<div class="mde-label"><span class="icon">📦</span>Product Visibility</div>', unsafe_allow_html=True)
         show_only_products = st.checkbox(
             "Has Products",
             key="filter_only_products",
         )
+    with pvc2:
+        st.markdown("<div class='mde-label'>&nbsp;</div>", unsafe_allow_html=True)
         show_no_products = st.checkbox(
             "No Products",
             key="filter_no_products",
         )
 
+    # --- THIRD ROW: Visited / Registered ---
     vc1, vc2 = st.columns(2)
     with vc1:
         st.markdown('<div class="mde-label"><span class="icon">🧭</span>Visited Status</div>', unsafe_allow_html=True)
@@ -500,7 +551,8 @@ with st.expander("🔍 Filter Data", expanded=True):
             key="filter_reg_status",
         )
 
-    mc1, mc2, mc3 = st.columns([3, 1, 1])
+    # --- FOURTH ROW: Mobile search + button ---
+    mc1, mc2 = st.columns([3, 1])
     with mc1:
         st.markdown('<div class="mde-label"><span class="icon">📱</span>Search by Mobile Number</div>', unsafe_allow_html=True)
         st.session_state["filter_mobile_input"] = st.text_input(
@@ -513,25 +565,28 @@ with st.expander("🔍 Filter Data", expanded=True):
         if st.button("Search", key="btn_mobile_search"):
             st.session_state["filter_mobile_query"] = st.session_state["filter_mobile_input"].strip()
             st.rerun()
-    with mc3:
-        st.markdown("&nbsp;", unsafe_allow_html=True)
-        if st.button("🔄 Reset Filters", key="btn_reset_filters"):
-            st.session_state["reset_filters"] = True
-            st.rerun()
 
-# ------------ APPLY FILTERS ------------
+# ------------ APPLY FILTERS USING NEW FIELDS ------------
 
 df_display = st.session_state["data"].copy()
 
 if not df_display.empty:
+    # Day
     selected_day = st.session_state.get("filter_day", "All")
     if selected_day != "All":
         df_display = df_display[df_display["DAY"] == selected_day]
 
+    # Location
     selected_location = st.session_state.get("filter_location", "All")
     if selected_location != "All":
         df_display = df_display[df_display["Location"] == selected_location]
 
+    # DLR
+    selected_dlr = st.session_state.get("filter_dlr", "All")
+    if selected_dlr != "All":
+        df_display = df_display[df_display["DLR NAME"] == selected_dlr]
+
+    # Category
     selected_cat = st.session_state.get("filter_cat", "All")
     if selected_cat == "Blank / Uncategorized":
         df_display = df_display[
@@ -540,6 +595,7 @@ if not df_display.empty:
     elif selected_cat != "All":
         df_display = df_display[df_display["Category"] == selected_cat]
 
+    # Visited
     visit_filter = st.session_state.get("filter_visit_status", "All")
     if "Visited_Status" in df_display.columns:
         if visit_filter == "Visited":
@@ -550,6 +606,7 @@ if not df_display.empty:
                 (df_display["Visited_Status"] == "")
             ]
 
+    # Registered
     reg_filter = st.session_state.get("filter_reg_status", "All")
     if "Registered_Status" in df_display.columns:
         if reg_filter == "Registered":
@@ -560,6 +617,7 @@ if not df_display.empty:
                 (df_display["Registered_Status"] == "")
             ]
 
+    # Products
     hw_cols = ["HW305", "HW101", "Hw201", "HW103", "HW302", "HW310"]
     show_only_products = st.session_state.get("filter_only_products", False)
     show_no_products = st.session_state.get("filter_no_products", False)
@@ -576,6 +634,7 @@ if not df_display.empty:
         )
         df_display = df_display[mask]
 
+    # Mobile search
     mobile_query = st.session_state.get("filter_mobile_query", "")
     if mobile_query and "CONTACT NUMBER" in df_display.columns:
         contact_str = df_display["CONTACT NUMBER"].astype(str).str.replace(".0", "", regex=False)
@@ -583,22 +642,38 @@ if not df_display.empty:
             contact_str.str.contains(mobile_query, case=False, na=False)
         ]
 
-# ------------ METRICS ------------
+# ------------ METRICS (HTML-STYLE KPIs) ------------
 
 st.markdown("### 📊 Dashboard Overview")
-m1, m2, m3, m4 = st.columns(4)
-m1.metric("Total Masons", len(st.session_state["data"]))
-m2.metric("Visible Rows", len(df_display))
-m3.metric(
-    "Unique Locations (Filtered)",
-    df_display["Location"].nunique() if "Location" in df_display.columns else 0,
+
+intro_text = (
+    "Welcome to the interactive Mason Data Explorer. Use the filters below to narrow "
+    "down the list and tap a card to view or update details."
 )
-m4.metric(
-    "Unique DLRs (Filtered)",
-    df_display["DLR NAME"].nunique() if "DLR NAME" in df_display.columns else 0,
-)
+st.markdown(intro_text)
+
+k1, k2, k3, k4 = st.columns(4)
+
+with k1:
+    st.metric("TOTAL MASONS", len(st.session_state["data"]))
+
+with k2:
+    st.metric("DISPLAYING", len(df_display))
+
+with k3:
+    st.metric(
+        "LOCATIONS",
+        df_display["Location"].nunique() if "Location" in df_display.columns else 0,
+    )
+
+with k4:
+    st.metric(
+        "DLRS",
+        df_display["DLR NAME"].nunique() if "DLR NAME" in df_display.columns else 0,
+    )
 
 st.divider()
+
 
 # ------------ MAIN TABS ------------
 
