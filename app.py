@@ -816,11 +816,48 @@ with tab_data:
         column_config=column_config,
     )
 
-    st.write("---")
+    import pandas as pd
 
-    if not st.session_state["data"].empty:
-        st.download_button(
-            "📥 Download Full Current Report (All Masons)",
-            to_excel(st.session_state["data"]),
-            "mason_full_report.xlsx",
-        )
+st.write("---")
+
+if st.button("💾 Save Changes to Main Data"):
+    # Safety check: data exists
+    if "data" not in st.session_state or st.session_state["data"].empty:
+        st.error("No main data loaded in session_state['data'].")
+    elif "S.NO" not in edited_df.columns or "S.NO" not in st.session_state["data"].columns:
+        st.error("Column 'S.NO' not found. Cannot map edited rows back to main data.")
+    else:
+        try:
+            save_state_for_undo()  # your existing undo logic
+
+            # Work on copies
+            base = st.session_state["data"].copy()
+            updated = edited_df.copy()
+
+            # 🔑 Make sure S.NO has the SAME TYPE in both
+            # (use Int64 so NaNs are allowed; change if you prefer plain int)
+            base["S.NO"] = pd.to_numeric(base["S.NO"], errors="coerce").astype("Int64")
+            updated["S.NO"] = pd.to_numeric(updated["S.NO"], errors="coerce").astype("Int64")
+
+            # Set index and update
+            base = base.set_index("S.NO")
+            updated = updated.set_index("S.NO")
+
+            # This will overwrite values in base with those from updated where index + column match
+            base.update(updated)
+
+            # Store back to session_state and Excel
+            st.session_state["data"] = base.reset_index()
+            st.session_state["data"].to_excel(DATA_FILE, index=False)
+
+            st.success("Changes saved to main dataset and Excel file!")
+        except Exception as e:
+            st.error(f"Error while saving changes: {e}")
+
+# Download button (unchanged)
+if "data" in st.session_state and not st.session_state["data"].empty:
+    st.download_button(
+        "📥 Download Full Current Report (All Masons)",
+        to_excel(st.session_state["data"]),
+        "mason_full_report.xlsx",
+    )
