@@ -1,65 +1,15 @@
 import streamlit as st
+import math
 import pandas as pd
 from io import BytesIO
+from pathlib import Path
 from datetime import datetime
-
-import gspread
-from google.oauth2.service_account import Credentials
+from calendar import monthrange
 
 # ------------ CONFIG ------------
-
 st.set_page_config(page_title="Mason Data Manager", layout="wide")
 
-# 🔗 GOOGLE SHEET CONFIG
-GOOGLE_SHEET_ID = "1JEAVT5DusNCw5kYaClvAPkA6_AtRJa0p46nS3r0vEKs"
-SHEET_TAB_NAME = "Master"  # change if your tab name is different
-
-# ------------ GOOGLE SHEETS HELPERS ------------
-
-@st.cache_resource
-def get_gsheet_client():
-    scopes = [
-        "https://www.googleapis.com/auth/spreadsheets",
-        "https://www.googleapis.com/auth/drive"
-    ]
-    creds = Credentials.from_service_account_info(
-        st.secrets["gcp_service_account"], scopes=scopes
-    )
-    return gspread.authorize(creds)
-
-def read_sheet(sheet_id: str, tab: str = SHEET_TAB_NAME) -> pd.DataFrame:
-    gc = get_gsheet_client()
-    sh = gc.open_by_key(sheet_id)
-    ws = sh.worksheet(tab)
-    data = ws.get_all_records()
-    return pd.DataFrame(data)
-
-def write_sheet(sheet_id: str, df: pd.DataFrame, tab: str = SHEET_TAB_NAME):
-    gc = get_gsheet_client()
-    sh = gc.open_by_key(sheet_id)
-    try:
-        ws = sh.worksheet(tab)
-    except gspread.exceptions.WorksheetNotFound:
-        ws = sh.add_worksheet(title=tab, rows="5000", cols="30")
-
-    # Always clear first so sheet really matches df
-    ws.clear()
-
-    if df.empty:
-        # Write only headers so sheet still has structure
-        ws.update([df.columns.tolist()]) if len(df.columns) > 0 else None
-        return
-
-    values = [df.columns.tolist()] + df.astype(str).values.tolist()
-    ws.update(values)
-
-def save_monthly_snapshot():
-    month_tab = datetime.now().strftime("%Y_%b")  # e.g. 2025_Nov
-    write_sheet(GOOGLE_SHEET_ID, st.session_state["data"], month_tab)
-    st.success(f"Monthly report saved to tab: {month_tab}")
-
-# ------------ HEADER ------------
-
+# Header similar to your HTML Mason Data Explorer
 st.markdown(
     """
     <header class="mde-header">
@@ -75,7 +25,6 @@ st.markdown(
 )
 
 # ------------ GLOBAL CSS (theme) ------------
-
 st.markdown("""
 <style>
 /* Page & layout */
@@ -208,7 +157,7 @@ div.stButton > button {
 </style>
 """, unsafe_allow_html=True)
 
-# Optional Tailwind JS
+# Optional Tailwind JS (not required but harmless)
 st.markdown('<script src="https://cdn.tailwindcss.com"></script>', unsafe_allow_html=True)
 
 # ------------ HELPERS ------------
@@ -251,30 +200,60 @@ def to_excel(df: pd.DataFrame) -> bytes:
         df.to_excel(writer, index=False, sheet_name="MasonData")
     return output.getvalue()
 
+DATA_FILE = "mason_data.xlsx"
+SNAPSHOT_DIR = Path("mason_snapshots")
+SNAPSHOT_DIR.mkdir(exist_ok=True)
+
+def save_month_snapshot(df: pd.DataFrame, month_key: str | None = None) -> Path:
+    """
+    Save current data as a month-wise snapshot file and return its path.
+    month_key format: 'YYYY-MM'. If None, use current month.
+    """
+    if month_key is None:
+        month_key = datetime.now().strftime("%Y-%m")
+    file_path = SNAPSHOT_DIR / f"mason_data_{month_key}.xlsx"
+    df.to_excel(file_path, index=False)
+    return file_path
+
+def auto_month_snapshot_and_reset():
+    """
+    On the LAST DAY of the current month:
+      - if snapshot for this month doesn't exist yet, create it
+      - clear visit / register columns and save data file.
+    This runs once when the app is used on that day.
+    """
+    now = datetime.now()
+    year, month = now.year, now.month
+    last_day = monthrange(year, month)[1]
+    month_key = f"{year}-{month:02d}"
+    snapshot_path = SNAPSHOT_DIR / f"mason_data_{month_key}.xlsx"
+
+    # Only act on the last day of the month, and only once
+    if now.day == last_day and not snapshot_path.exists():
+        # Save snapshot
+        save_month_snapshot(st.session_state["data"], month_key=month_key)
+
+        # Clear visit / register columns
+        for col in ["Visited_Status", "Visited_At", "Registered_Status", "Registered_At"]:
+            if col in st.session_state["data"].columns:
+                st.session_state["data"][col] = ""
+
+        # Persist cleared data
+        st.session_state["data"].to_excel(DATA_FILE, index=False)
+
 def get_initial_dataset() -> pd.DataFrame:
-    try:
-        df = read_sheet(GOOGLE_SHEET_ID, SHEET_TAB_NAME)
-        if df.empty:
-            st.warning(f"Google Sheet tab '{SHEET_TAB_NAME}' is empty. Starting with blank dataset.")
-            df = pd.DataFrame(columns=[
-                "S.NO", "MASON CODE", "MASON NAME", "CONTACT NUMBER",
-                "DLR NAME", "Location", "DAY", "Category",
-                "HW305", "HW101", "Hw201", "HW103", "HW302", "HW310", "other",
-                "Visited_Status", "Visited_At", "Registered_Status", "Registered_At"
-            ])
-        else:
-            st.success(f"Loaded {len(df)} rows from Google Sheet '{SHEET_TAB_NAME}'.")
+    if Path(DATA_FILE).exists():
+        df = pd.read_excel(DATA_FILE)
         return clean_dataframe(df)
-    except Exception as e:
-        st.error("❌ Failed to load data from Google Sheets. Starting with empty dataset.")
-        st.exception(e)
-        df = pd.DataFrame(columns=[
-            "S.NO", "MASON CODE", "MASON NAME", "CONTACT NUMBER",
-            "DLR NAME", "Location", "DAY", "Category",
-            "HW305", "HW101", "Hw201", "HW103", "HW302", "HW310", "other",
-            "Visited_Status", "Visited_At", "Registered_Status", "Registered_At"
-        ])
-        return df
+
+    st.warning("No DATA_FILE found. Starting with empty dataset. Use Import Excel or Add Single Entry.")
+    df = pd.DataFrame(columns=[
+        "S.NO", "MASON CODE", "MASON NAME", "CONTACT NUMBER",
+        "DLR NAME", "Location", "DAY", "Category",
+        "HW305", "HW101", "Hw201", "HW103", "HW302", "HW310", "other",
+        "Visited_Status", "Visited_At", "Registered_Status", "Registered_At"
+    ])
+    return df
 
 # ------------ SESSION STATE INIT ------------
 
@@ -289,10 +268,14 @@ for col in ["Visited_Status", "Visited_At", "Registered_Status", "Registered_At"
     if col not in st.session_state["data"].columns:
         st.session_state["data"][col] = ""
 
+# Run automatic month-end snapshot + reset logic
+auto_month_snapshot_and_reset()
+
 # Filter-related session defaults
 defaults = {
     "filter_day": "All",
     "filter_location": "All",
+    "filter_dlr": "All",          # DLR filter
     "filter_cat": "All",
     "filter_visit_status": "All",
     "filter_reg_status": "All",
@@ -302,6 +285,7 @@ defaults = {
     "filter_no_products": False,
     "reset_filters": False,
 }
+
 for k, v in defaults.items():
     if k not in st.session_state:
         st.session_state[k] = v
@@ -315,11 +299,10 @@ if st.session_state.get("reset_filters", False):
 # ------------ INLINE UPDATE FUNCTION FOR CARDS ------------
 
 def update_entry(sno: int, column_name: str, widget_key: str, is_checkbox: bool = False):
-    """Update one field from card widgets and push to Google Sheets."""
+    """Update a single cell in st.session_state['data'] from a widget."""
     df = st.session_state["data"]
     if "S.NO" not in df.columns:
         return
-
     mask = df["S.NO"] == sno
     if not mask.any():
         return
@@ -332,22 +315,24 @@ def update_entry(sno: int, column_name: str, widget_key: str, is_checkbox: bool 
         df.loc[mask, column_name] = val
 
     st.session_state["data"] = df
-    write_sheet(GOOGLE_SHEET_ID, df.copy(), SHEET_TAB_NAME)
+    st.session_state["data"].to_excel(DATA_FILE, index=False)
 
 # ------------ DATA MANAGEMENT EXPANDER ------------
 
-with st.expander("🛠️ Data Management (Import / Add / Undo)", expanded=False):
+with st.expander("🛠️ Data Management (Import / Add / Undo / Export)", expanded=False):
 
     # Undo
     if st.session_state["prev_data"] is not None:
         if st.button("↩️ Undo Last Change", type="primary"):
             st.session_state["data"] = st.session_state["prev_data"]
             st.session_state["prev_data"] = None
-            write_sheet(GOOGLE_SHEET_ID, st.session_state["data"], SHEET_TAB_NAME)
+            st.session_state["data"].to_excel(DATA_FILE, index=False)
             st.success("Restored previous version!")
             st.rerun()
 
-    op_tab1, op_tab2, op_tab3 = st.tabs(["➕ Add Single Entry", "📂 Import Excel", "📅 Monthly Snapshot"])
+    op_tab1, op_tab2, op_tab3 = st.tabs(
+        ["➕ Add Single Entry", "📂 Import Excel", "📤 Export / Snapshots"]
+    )
 
     # --- IMPORT TAB ---
     with op_tab2:
@@ -364,22 +349,63 @@ with st.expander("🛠️ Data Management (Import / Add / Undo)", expanded=False
                         for col in ["Visited_Status", "Visited_At", "Registered_Status", "Registered_At"]:
                             if col not in st.session_state["data"].columns:
                                 st.session_state["data"][col] = ""
-                        write_sheet(GOOGLE_SHEET_ID, st.session_state["data"], SHEET_TAB_NAME)
-                        st.success(f"Loaded {len(new_data)} rows and saved to Google Sheet!")
+                        st.session_state["data"].to_excel(DATA_FILE, index=False)
+                        st.success(f"Loaded {len(new_data)} rows and saved to {DATA_FILE}!")
                         st.rerun()
 
-        with col2:
-            st.info("Step 1: Download Template")
-            st.download_button(
-                label="📄 Download Blank Excel Template",
-                data=get_template_excel(),
-                file_name="mason_data_template.xlsx",
-                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-            )
+    # --- EXPORT / SNAPSHOTS TAB ---
+    with op_tab3:
+        st.subheader("Export & Monthly Snapshots")
+
+        # 1) Download current full dataset (live data)
+        st.markdown("**Download current full dataset**")
+        st.download_button(
+            "📥 Download Current Data",
+            to_excel(st.session_state["data"]),
+            file_name=f"mason_data_{datetime.now().strftime('%Y-%m-%d_%H%M')}.xlsx",
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        )
+
+        st.markdown("---")
+
+        # 2) Save / overwrite this month's snapshot to disk (manual trigger)
+        st.markdown("**Save / update this month's snapshot (manual)**")
+        st.caption(
+            "This saves the current data as `mason_data_YYYY-MM.xlsx` inside the `mason_snapshots` folder. "
+            "Note: the app also auto-saves & clears visit/register columns on the last day of each month."
+        )
+
+        if st.button("💾 Save This Month Snapshot", key="btn_save_snapshot_manual"):
+            month_key_now = datetime.now().strftime("%Y-%m")
+            snapshot_path = save_month_snapshot(st.session_state["data"], month_key=month_key_now)
+            st.success(f"Snapshot saved as: {snapshot_path.name}")
+
+        st.markdown("---")
+
+        # 3) Dropdown of existing monthly snapshot files with single download button
+        st.markdown("**Download a monthly snapshot**")
+
+        snapshot_files = sorted(SNAPSHOT_DIR.glob("mason_data_*.xlsx"), reverse=True)
+        if not snapshot_files:
+            st.caption("No snapshots saved yet.")
+        else:
+            month_options = [f.stem.replace("mason_data_", "") for f in snapshot_files]
+            selected_month = st.selectbox("Select month", month_options, key="snapshot_month_select")
+            chosen_path = snapshot_files[month_options.index(selected_month)]
+
+            with open(chosen_path, "rb") as fh:
+                st.download_button(
+                    label=f"📅 Download {selected_month} snapshot",
+                    data=fh.read(),
+                    file_name=chosen_path.name,
+                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    key=f"dl_snapshot_{selected_month}",
+                )
 
     # --- ADD ENTRY TAB ---
     with op_tab1:
-        with st.form("entry_form"):
+        # use clear_on_submit to reset form
+        with st.form("entry_form", clear_on_submit=True):
             c1, c2, c3 = st.columns(3)
             with c1:
                 mason_code = st.text_input("Mason Code", key="form_mason_code")
@@ -457,73 +483,109 @@ with st.expander("🛠️ Data Management (Import / Add / Undo)", expanded=False
                         [st.session_state["data"], pd.DataFrame([new_row])],
                         ignore_index=True,
                     )
-                    write_sheet(GOOGLE_SHEET_ID, st.session_state["data"], SHEET_TAB_NAME)
+                    st.session_state["data"].to_excel(DATA_FILE, index=False)
 
-                    # CLEAR FORM FIELDS
-                    for key in [
-                        "form_mason_code", "form_mason_name", "form_contact_number",
-                        "form_dlr_name", "form_location", "form_other"
-                    ]:
-                        st.session_state[key] = ""
-                    for key in ["form_hw305", "form_hw101", "form_hw201", "form_hw103", "form_hw302", "form_hw310"]:
-                        st.session_state[key] = False
-                    st.session_state["form_day"] = "MONDAY"
-                    st.session_state["form_category"] = "E"
-
-                    st.success("Entry added & saved to Google Sheet!")
+                    st.success("Entry added & saved!")
                     st.rerun()
 
-    # --- MONTHLY SNAPSHOT TAB ---
-    with op_tab3:
-        st.info("Save the current data as a monthly snapshot sheet in the same Google Sheet.")
-        if st.button("📅 Save Monthly Report to Google Sheet"):
-            save_monthly_snapshot()
+        # col2 defined in Import tab block above
+        with col2:
+            st.info("Step 1: Download Template")
+            st.download_button(
+                label="📄 Download Blank Excel Template",
+                data=get_template_excel(),
+                file_name="mason_data_template.xlsx",
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            )
 
-# ------------ FILTER SECTION ------------
+# ------------ FILTERS + METRICS SECTION ------------
 
-with st.expander("🔍 Filter Data", expanded=True):
+with st.expander("Filters", expanded=True):
     base_df = st.session_state["data"].copy()
 
-    # --- FIRST ROW: Day, Location, Category, Product flags ---
+    # --- HEADER ROW: title + reset link ---
+    h1, h2 = st.columns([3, 1])
+    with h1:
+        st.markdown("### Filters")
+    with h2:
+        st.markdown(
+            "<div style='text-align:right;margin-top:0.6rem;'>",
+            unsafe_allow_html=True,
+        )
+        if st.button("🔄 Reset Filters", key="btn_reset_filters_top"):
+            st.session_state["reset_filters"] = True
+            st.rerun()
+        st.markdown("</div>", unsafe_allow_html=True)
+
+    st.markdown("---")
+
+    # --- FIRST ROW: Location, DLR, Day, Category (cascade) ---
     fc1, fc2, fc3, fc4 = st.columns(4)
 
-    with fc1:
+    # DAY options (for cascading)
+    days_list = [
+        str(x).strip()
+        for x in base_df.get("DAY", "").unique()
+        if str(x).strip()
+    ]
+    all_days = ["All"] + sorted(set(days_list))
+
+    with fc3:
         st.markdown('<div class="mde-label"><span class="icon">📅</span>Day</div>', unsafe_allow_html=True)
-        days_list = [
-            str(x).strip()
-            for x in base_df.get("DAY", "").unique()
-            if str(x).strip()
-        ]
-        days = ["All"] + sorted(set(days_list))
         selected_day = st.selectbox(
             "",
-            days,
+            all_days,
             key="filter_day",
         )
 
-    df_for_location = base_df.copy()
+    # dataframe limited by day (for next cascades)
+    df_after_day = base_df.copy()
     if selected_day != "All":
-        df_for_location = df_for_location[df_for_location["DAY"] == selected_day]
+        df_after_day = df_after_day[df_after_day["DAY"] == selected_day]
 
-    with fc2:
+    # LOCATION options depend on day
+    locs = [
+        str(x).strip()
+        for x in df_after_day.get("Location", "").unique()
+        if str(x).strip()
+    ]
+    all_locs = ["All"] + sorted(set(locs))
+
+    with fc1:
         st.markdown('<div class="mde-label"><span class="icon">📍</span>Location</div>', unsafe_allow_html=True)
-        locs = [
-            str(x).strip()
-            for x in df_for_location.get("Location", "").unique()
-            if str(x).strip()
-        ]
-        locations = ["All"] + sorted(set(locs))
         selected_location = st.selectbox(
             "",
-            locations,
+            all_locs,
             key="filter_location",
         )
 
-    df_for_category = df_for_location.copy()
+    # dataframe limited by day + location
+    df_after_loc = df_after_day.copy()
     if selected_location != "All":
-        df_for_category = df_for_category[df_for_category["Location"] == selected_location]
+        df_after_loc = df_after_loc[df_after_loc["Location"] == selected_location]
 
-    with fc3:
+    # DLR options depend on day + location
+    dlrs_raw = [
+        str(x).strip()
+        for x in df_after_loc.get("DLR NAME", "").unique()
+        if str(x).strip()
+    ]
+    all_dlrs = ["All"] + sorted(set(dlrs_raw))
+
+    with fc2:
+        st.markdown('<div class="mde-label"><span class="icon">🏪</span>DLR Name</div>', unsafe_allow_html=True)
+        selected_dlr = st.selectbox(
+            "",
+            all_dlrs,
+            key="filter_dlr",
+        )
+
+    # dataframe limited by day + location + dlr (for Category options)
+    df_for_category = df_after_loc.copy()
+    if selected_dlr != "All":
+        df_for_category = df_for_category[df_for_category["DLR NAME"] == selected_dlr]
+
+    with fc4:
         st.markdown('<div class="mde-label"><span class="icon">🏷️</span>Category</div>', unsafe_allow_html=True)
         cats_raw = [
             str(x).strip()
@@ -541,18 +603,23 @@ with st.expander("🔍 Filter Data", expanded=True):
             key="filter_cat",
         )
 
-    with fc4:
+    # --- SECOND ROW: Product visibility ---
+    pvc1, pvc2, pvc3 = st.columns([1, 1, 2])
+    with pvc1:
         st.markdown('<div class="mde-label"><span class="icon">📦</span>Product Visibility</div>', unsafe_allow_html=True)
         show_only_products = st.checkbox(
             "Has Products",
             key="filter_only_products",
         )
+    with pvc2:
+        st.markdown("<div class='mde-label'>&nbsp;</div>", unsafe_allow_html=True)
         show_no_products = st.checkbox(
             "No Products",
             key="filter_no_products",
         )
 
-    vc1, vc2, vc3 = st.columns([2, 2, 2])
+    # --- THIRD ROW: Visited / Registered ---
+    vc1, vc2 = st.columns(2)
     with vc1:
         st.markdown('<div class="mde-label"><span class="icon">🧭</span>Visited Status</div>', unsafe_allow_html=True)
         visit_filter = st.selectbox(
@@ -567,37 +634,43 @@ with st.expander("🔍 Filter Data", expanded=True):
             ["All", "Registered", "Not Registered"],
             key="filter_reg_status",
         )
-    with vc3:
+
+    # --- FOURTH ROW: Mobile search + button ---
+    mc1, mc2 = st.columns([3, 1])
+    with mc1:
         st.markdown('<div class="mde-label"><span class="icon">📱</span>Search by Mobile Number</div>', unsafe_allow_html=True)
         st.session_state["filter_mobile_input"] = st.text_input(
             "",
             value=st.session_state.get("filter_mobile_input", ""),
             placeholder="Enter full or partial number...",
         )
-
-    sc1, sc2 = st.columns([1, 1])
-    with sc1:
+    with mc2:
+        st.markdown("&nbsp;", unsafe_allow_html=True)
         if st.button("Search", key="btn_mobile_search"):
             st.session_state["filter_mobile_query"] = st.session_state["filter_mobile_input"].strip()
             st.rerun()
-    with sc2:
-        if st.button("🔄 Reset Filters", key="btn_reset_filters"):
-            st.session_state["reset_filters"] = True
-            st.rerun()
 
-# ------------ APPLY FILTERS ------------
+# ------------ APPLY FILTERS USING NEW FIELDS ------------
 
 df_display = st.session_state["data"].copy()
 
 if not df_display.empty:
+    # Day
     selected_day = st.session_state.get("filter_day", "All")
     if selected_day != "All":
         df_display = df_display[df_display["DAY"] == selected_day]
 
+    # Location
     selected_location = st.session_state.get("filter_location", "All")
     if selected_location != "All":
         df_display = df_display[df_display["Location"] == selected_location]
 
+    # DLR
+    selected_dlr = st.session_state.get("filter_dlr", "All")
+    if selected_dlr != "All":
+        df_display = df_display[df_display["DLR NAME"] == selected_dlr]
+
+    # Category
     selected_cat = st.session_state.get("filter_cat", "All")
     if selected_cat == "Blank / Uncategorized":
         df_display = df_display[
@@ -606,6 +679,7 @@ if not df_display.empty:
     elif selected_cat != "All":
         df_display = df_display[df_display["Category"] == selected_cat]
 
+    # Visited
     visit_filter = st.session_state.get("filter_visit_status", "All")
     if "Visited_Status" in df_display.columns:
         if visit_filter == "Visited":
@@ -616,6 +690,7 @@ if not df_display.empty:
                 (df_display["Visited_Status"] == "")
             ]
 
+    # Registered
     reg_filter = st.session_state.get("filter_reg_status", "All")
     if "Registered_Status" in df_display.columns:
         if reg_filter == "Registered":
@@ -626,6 +701,7 @@ if not df_display.empty:
                 (df_display["Registered_Status"] == "")
             ]
 
+    # Products
     hw_cols = ["HW305", "HW101", "Hw201", "HW103", "HW302", "HW310"]
     show_only_products = st.session_state.get("filter_only_products", False)
     show_no_products = st.session_state.get("filter_no_products", False)
@@ -642,6 +718,7 @@ if not df_display.empty:
         )
         df_display = df_display[mask]
 
+    # Mobile search
     mobile_query = st.session_state.get("filter_mobile_query", "")
     if mobile_query and "CONTACT NUMBER" in df_display.columns:
         contact_str = df_display["CONTACT NUMBER"].astype(str).str.replace(".0", "", regex=False)
@@ -649,20 +726,35 @@ if not df_display.empty:
             contact_str.str.contains(mobile_query, case=False, na=False)
         ]
 
-# ------------ METRICS ------------
+# ------------ METRICS (HTML-STYLE KPIs) ------------
 
 st.markdown("### 📊 Dashboard Overview")
-m1, m2, m3, m4 = st.columns(4)
-m1.metric("Total Masons", len(st.session_state["data"]))
-m2.metric("Visible Rows", len(df_display))
-m3.metric(
-    "Unique Locations (Filtered)",
-    df_display["Location"].nunique() if "Location" in df_display.columns else 0,
+
+intro_text = (
+    "Welcome to the interactive Mason Data Explorer. Use the filters below to narrow "
+    "down the list and tap a card to view or update details."
 )
-m4.metric(
-    "Unique DLRs (Filtered)",
-    df_display["DLR NAME"].nunique() if "DLR NAME" in df_display.columns else 0,
-)
+st.markdown(intro_text)
+
+k1, k2, k3, k4 = st.columns(4)
+
+with k1:
+    st.metric("TOTAL MASONS", len(st.session_state["data"]))
+
+with k2:
+    st.metric("DISPLAYING", len(df_display))
+
+with k3:
+    st.metric(
+        "LOCATIONS",
+        df_display["Location"].nunique() if "Location" in df_display.columns else 0,
+    )
+
+with k4:
+    st.metric(
+        "DLRS",
+        df_display["DLR NAME"].nunique() if "DLR NAME" in df_display.columns else 0,
+    )
 
 st.divider()
 
@@ -673,16 +765,54 @@ tab_cards, tab_graphs, tab_data = st.tabs(
 )
 
 # ==========================================
-#        EDITABLE CARDS SECTION
+#   EDITABLE CARDS SECTION (PAGINATED)
 # ==========================================
 with tab_cards:
     st.subheader("Mason Directory")
-    st.info("💡 Tip: Click a card to expand. Any change you make inside is saved to Google Sheets automatically.")
+    st.info("💡 **Tip:** Click a card to expand. Any change you make inside is **saved automatically**.")
 
     if df_display.empty:
         st.warning("No records found matching filters.")
     else:
-        for index, row in df_display.iterrows():
+        # ---------- PAGINATION CONTROLS ----------
+        total_cards = len(df_display)
+
+        c1, c2, c3 = st.columns([1, 1, 3])
+        with c1:
+            page_size = st.selectbox(
+                "Cards per page",
+                [10, 20, 50],
+                index=1,
+                key="cards_page_size",
+            )
+        total_pages = max(1, math.ceil(total_cards / page_size))
+
+        with c2:
+            current_page = st.number_input(
+                "Page",
+                min_value=1,
+                max_value=total_pages,
+                value=min(st.session_state.get("cards_page", 1), total_pages),
+                step=1,
+                key="cards_page",
+            )
+
+        start_idx = (current_page - 1) * page_size
+        end_idx = start_idx + page_size
+        df_page = df_display.iloc[start_idx:end_idx]
+
+        with c3:
+            st.markdown(
+                f"<div style='margin-top:1.7rem;font-size:0.85rem;color:#6b7280;'>"
+                f"Showing <b>{start_idx + 1}</b> – <b>{min(end_idx, total_cards)}</b> of <b>{total_cards}</b> records"
+                f"</div>",
+                unsafe_allow_html=True,
+            )
+
+        st.markdown("---")
+
+        # ---------- RENDER ONLY CURRENT PAGE CARDS ----------
+        for index, row in df_page.iterrows():
             sno = int(row["S.NO"]) if "S.NO" in row else index
 
             # Header visuals
@@ -696,9 +826,9 @@ with tab_cards:
 
             status_badges = ""
             if is_visited:
-                status_badges += "🧭 "
+                status_badges += "🧭Visited |"
             if is_registered:
-                status_badges += "✅ "
+                status_badges += "✅Registered |"
 
             card_label = f"{status_badges} **{name}** "
             if code:
@@ -785,7 +915,7 @@ with tab_cards:
                             value=is_checked,
                             key=f"{prod}_{sno}",
                             on_change=update_entry,
-                            args=(sno, prod, f"{prod}_{sno}", True)
+                            args=(sno, prod, f"{prod}_{sno}", True)  # checkbox logic
                         )
 
                 # 4. REMARKS / OTHER
@@ -817,28 +947,24 @@ with tab_cards:
                     v_label = "✅ Visited" if is_visited else "Mark Visited"
                     v_type = "primary" if is_visited else "secondary"
                     if st.button(v_label, key=f"btn_vis_{sno}", type=v_type, use_container_width=True):
-                        df = st.session_state["data"]
                         new_status = "" if is_visited else "Visited"
-                        df.loc[df["S.NO"] == sno, "Visited_Status"] = new_status
-                        df.loc[df["S.NO"] == sno, "Visited_At"] = (
+                        st.session_state["data"].loc[st.session_state["data"]["S.NO"] == sno, "Visited_Status"] = new_status
+                        st.session_state["data"].loc[st.session_state["data"]["S.NO"] == sno, "Visited_At"] = (
                             datetime.now().strftime("%Y-%m-%d") if new_status else ""
                         )
-                        st.session_state["data"] = df
-                        write_sheet(GOOGLE_SHEET_ID, df.copy(), SHEET_TAB_NAME)
+                        st.session_state["data"].to_excel(DATA_FILE, index=False)
                         st.rerun()
 
                 with b3:
                     r_label = "✅ Registered" if is_registered else "Mark Registered"
                     r_type = "primary" if is_registered else "secondary"
                     if st.button(r_label, key=f"btn_reg_{sno}", type=r_type, use_container_width=True):
-                        df = st.session_state["data"]
                         new_status = "" if is_registered else "Registered"
-                        df.loc[df["S.NO"] == sno, "Registered_Status"] = new_status
-                        df.loc[df["S.NO"] == sno, "Registered_At"] = (
+                        st.session_state["data"].loc[st.session_state["data"]["S.NO"] == sno, "Registered_Status"] = new_status
+                        st.session_state["data"].loc[st.session_state["data"]["S.NO"] == sno, "Registered_At"] = (
                             datetime.now().strftime("%Y-%m-%d") if new_status else ""
                         )
-                        st.session_state["data"] = df
-                        write_sheet(GOOGLE_SHEET_ID, df.copy(), SHEET_TAB_NAME)
+                        st.session_state["data"].to_excel(DATA_FILE, index=False)
                         st.rerun()
 
 # ----- ANALYTICS TAB -----
@@ -884,7 +1010,7 @@ with tab_graphs:
 
 # ----- DATA EDITOR TAB -----
 with tab_data:
-    st.subheader("Raw Data Table (Editable View)")
+    st.subheader("Raw Data Table (Editable)")
 
     column_config = {
         "CONTACT NUMBER": st.column_config.TextColumn("Contact"),
@@ -896,11 +1022,14 @@ with tab_data:
         "HW310": st.column_config.TextColumn("HW310", width="small"),
     }
 
-    # Work on the currently visible (filtered) data
+    # Work on the currently filtered data
     edit_df = df_display.copy()
+
+    # Make sure CONTACT NUMBER is string so edits don't break
     if not edit_df.empty and "CONTACT NUMBER" in edit_df.columns:
         edit_df["CONTACT NUMBER"] = edit_df["CONTACT NUMBER"].astype(str)
 
+    # Show editor and capture edits
     edited_df = st.data_editor(
         edit_df,
         num_rows="dynamic",
@@ -912,39 +1041,57 @@ with tab_data:
 
     st.write("---")
 
-    # Row: left = download, right = save to Google Sheet
-    c1, c2 = st.columns([2, 1])
+    if st.button("💾 Save Data Editor Changes"):
+        if edit_df.empty:
+            st.info("Nothing to save – table is empty.")
+        elif "S.NO" not in edit_df.columns or "S.NO" not in edited_df.columns:
+            st.error("Cannot save changes because 'S.NO' column is missing.")
+        else:
+            # Use S.NO as primary key
+            orig_visible = edit_df.set_index("S.NO")
+            edited_visible = edited_df.set_index("S.NO")
 
-    with c1:
-        if not st.session_state["data"].empty:
-            st.download_button(
-                "📥 Download Full Current Report (All Masons)",
-                to_excel(st.session_state["data"]),
-                "mason_full_report.xlsx",
-            )
-
-    with c2:
-        if st.button("💾 Save Changes to Google Sheet", use_container_width=True):
-            if edited_df.empty:
-                st.warning("No rows in the editor to save.")
+            # Full dataset
+            main = st.session_state["data"].copy()
+            if "S.NO" not in main.columns:
+                st.error("Main data has no 'S.NO' column. Cannot sync edits.")
             else:
-                # Merge only edited visible rows back into full dataset
-                full_df = st.session_state["data"].copy()
+                main = main.set_index("S.NO")
 
-                if "S.NO" in edited_df.columns and "S.NO" in full_df.columns:
-                    full_df = full_df.set_index("S.NO")
-                    edited_idx = edited_df.set_index("S.NO")
+                # 1️⃣ Deletions: rows that were visible but no longer exist
+                to_delete = set(orig_visible.index) - set(edited_visible.index)
+                if to_delete:
+                    main = main.drop(index=list(to_delete), errors="ignore")
 
-                    # Update matching S.NO rows with edited values
-                    full_df.update(edited_idx)
+                # 2️⃣ Updates: rows that still exist (overwrite visible columns)
+                common_ids = list(set(orig_visible.index) & set(edited_visible.index))
+                if common_ids:
+                    # Align columns that exist in both
+                    common_cols = [
+                        c for c in edited_visible.columns if c in main.columns
+                    ]
+                    main.loc[common_ids, common_cols] = edited_visible.loc[
+                        common_ids, common_cols
+                    ]
 
-                    full_df.reset_index(inplace=True)
-                else:
-                    # Fallback: overwrite everything (if no S.NO present)
-                    full_df = edited_df.copy()
+                # 3️⃣ New rows: present in edited table, not in original visible set
+                new_ids = list(set(edited_visible.index) - set(orig_visible.index))
+                if new_ids:
+                    new_rows = edited_visible.loc[new_ids].reset_index()  # includes S.NO
+                    main_reset = main.reset_index()  # bring S.NO back as a column
+                    main_reset = pd.concat([main_reset, new_rows], ignore_index=True)
+                    main = main_reset.set_index("S.NO")
 
-                # Save back to session + Google Sheet
-                st.session_state["data"] = full_df
-                write_sheet(GOOGLE_SHEET_ID, full_df.copy(), SHEET_TAB_NAME)
-                st.success("Changes saved to Google Sheet from Data Editor!")
+                # Save back to session + disk
+                st.session_state["data"] = main.reset_index()
+                st.session_state["data"].to_excel(DATA_FILE, index=False)
+
+                st.success("Changes from Data Editor saved.")
                 st.rerun()
+
+    if not st.session_state["data"].empty:
+        st.download_button(
+            "📥 Download Full Current Report (All Masons)",
+            to_excel(st.session_state["data"]),
+            "mason_full_report.xlsx",
+        )
